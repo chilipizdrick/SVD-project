@@ -1,57 +1,44 @@
 {
-  description = "Flake for SVD project";
-  inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    flake-parts.url = "github:hercules-ci/flake-parts";
-  };
-  outputs = inputs:
-    inputs.flake-parts.lib.mkFlake {inherit inputs;} {
-      systems = ["x86_64-linux"];
-      perSystem = {pkgs, ...}: let
-        llvmPkgs = pkgs.llvmPackages;
-        lib = pkgs.lib;
-        libraries = [
-          pkgs.lapack
-          llvmPkgs.libcxx
-          llvmPkgs.libllvm
-          llvmPkgs.lldb
-        ];
+  description = "SVD-project nix flake";
 
-        pythonEnv = pkgs.python3.withPackages (ps:
-          with ps; [
-            pyqt6
-          ]);
-      in {
-        devShells.default = pkgs.mkShell.override {stdenv = llvmPkgs.stdenv;} {
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+
+  outputs = {nixpkgs, ...}: let
+    systems = [
+      "x86_64-darwin"
+      "x86_64-linux"
+      "aarch64-darwin"
+      "aarch64-linux"
+    ];
+    forAllSystems = nixpkgs.lib.genAttrs systems;
+    forAllPkgs = f: forAllSystems (system: let pkgs = nixpkgs.legacyPackages.${system}; in f pkgs);
+  in {
+    devShells = forAllPkgs (pkgs: {
+      default = let
+        libs =
+          [
+            pkgs.lapack-reference
+            pkgs.eigen
+            pkgs.boost
+          ]
+          ++ pkgs.lib.optionals pkgs.stdenv.hostPlatform.isLinux [
+            pkgs.llvmPackages.libcxx
+          ];
+      in
+        pkgs.mkShell.override {stdenv = pkgs.llvmPackages.stdenv;} {
           nativeBuildInputs = [
-            llvmPkgs.clang
+            pkgs.cmake
+            pkgs.gfortran
+            pkgs.llvmPackages.clang
+            pkgs.ninja
             pkgs.pkg-config
-            pkgs.cmakeCurses
-            (pkgs.writeShellScriptBin "build" ''cmake -G "Ninja" CMakeLists.txt && ninja'') # build project via CMake
-            (pkgs.writeShellScriptBin "run" ''cmake -G "Ninja" CMakeLists.txt && ninja && ./svd_test'') # run project via CMake
-            (pkgs.writeShellScriptBin "bd" ''cmake -G "Ninja" CMakeLists.txt && ninja'') # alias for build
-            (pkgs.writeShellScriptBin "compare" ''python ./src/benchmarks/compare_csv.py'')
-            (pkgs.writeShellScriptBin "dv" ''nix develop path:$PWD'')
+            pkgs.clang-tools
+
+            (pkgs.writeShellScriptBin "build" ''cmake -B build -G "Ninja" && cmake --build build'')
           ];
-          buildInputs = with pkgs;
-            libraries
-            ++ [
-              cmake
-              eigen
-              boost
-              llvmPkgs.clang-tools
-              ninja
-              pythonEnv
-            ];
-          LD_LIBRARY_PATH = "${llvmPkgs.stdenv.cc.cc.lib.outPath}/lib:${pkgs.lib.makeLibraryPath libraries}";
-          CLANGD_FLAGS = "--query-driver=${llvmPkgs.clang}/bin/clang";
-          PKG_CONFIG_PATH = "${pkgs.lib.makeSearchPathOutput "dev" "lib/pkgconfig" [pkgs.lapack]}";
-          CPATH = builtins.concatStringsSep ":" [
-            (lib.makeSearchPath "include/eigen3" [pkgs.eigen])
-            (lib.makeSearchPath "resource-root/include" [llvmPkgs.clang])
-            (lib.makeSearchPathOutput "dev" "include" [llvmPkgs.libcxx pkgs.lapack])
-          ];
+          buildInputs = libs;
+          LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath libs;
         };
-      };
-    };
+    });
+  };
 }
