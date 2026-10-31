@@ -94,6 +94,8 @@ set(HEADER_FILES
     src/lib/iterative_refinement/iterative_refinement.cpp
 
     # Parfenov's & Drozdov's ideas
+    src/lib/halley/halley_svd.h
+    src/lib/halley/halley_svd.cpp
     src/lib/idea1_givref/givens_refinement.h
     src/lib/idea1_givref/givens_refinement.cpp
     src/lib/idea2_revjac/reverse_jacobi.h
