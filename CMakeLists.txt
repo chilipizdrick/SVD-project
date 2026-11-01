@@ -1,113 +1,78 @@
-cmake_minimum_required(VERSION 3.10)
-
-project(svd VERSION 1.0.0 DESCRIPTION "Implementations of experimental SVD algorithms")
-
-set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS YES CACHE BOOL "Export all symbols")
-
-
-# ========== Конфигурация сборки ===========
+cmake_minimum_required(VERSION 3.20)
+project(svd VERSION 1.0.0 LANGUAGES CXX C)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS YES CACHE BOOL "Export all symbols")
-set(THREADS 4 CACHE STRING "Количество потоков при запуске тестов (один тест в один поток)")
 
-configure_file(src/config.h.in config.h)
-include_directories(${CMAKE_BINARY_DIR})
+# Export symbols on Windows if building shared libraries
+set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
-# ==========================================
+# ================= Dependencies =================
 
-
-# ============== Зависимости: ==============
-
-find_package(Eigen3 REQUIRED)
-find_package(lapacke REQUIRED)
+# 1. Eigen3 & Boost (Standard CMake imported targets across vcpkg and Nix)
+find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 find_package(Boost REQUIRED)
 
-# Если возникают проблемы с pkg-config, можно раскомментировать следующий блок:
-# find_package(PkgConfig REQUIRED)
-# pkg_check_modules(EIGEN3 REQUIRED eigen3)
-# pkg_check_modules(LAPACKE REQUIRED lapacke)
+# 2. LAPACK & LAPACKE
+# Try finding via CMake config first (vcpkg provides lapack/lapacke this way)
+find_package(lapack CONFIG QUIET)
+find_package(LAPACKE CONFIG QUIET)
 
-# При этом нужно внести изменение в сборку целевых объектов:
+if(TARGET lapacke)
+    set(LAPACKE_LINK_TARGET lapacke)
+else()
+    # Fallback to PkgConfig (common on Linux/NixOS)
+    find_package(PkgConfig QUIET)
+    if(PKG_CONFIG_FOUND)
+        pkg_check_modules(PKG_LAPACKE QUIET IMPORTED_TARGET lapacke)
+    endif()
 
-# add_library(svd ${SOURCE_FILES} ${HEADER_FILES}
-#   src/givens_refinement.h)
-# target_compile_features(svd PRIVATE cxx_std_20)
-# target_include_directories(svd PUBLIC ${EIGEN3_INCLUDE_DIRS})
-# target_link_libraries(svd ${LAPACKE_LIBRARIES})
+    if(TARGET PkgConfig::PKG_LAPACKE)
+        set(LAPACKE_LINK_TARGET PkgConfig::PKG_LAPACKE)
+    else()
+        # Fallback to CMake's built-in FindLAPACK + manual header/lib check
+        find_package(LAPACK REQUIRED)
+        find_path(LAPACKE_INCLUDE_DIR NAMES lapacke.h)
+        find_library(LAPACKE_LIB NAMES lapacke)
 
-# ==========================================
+        if(NOT LAPACKE_INCLUDE_DIR OR NOT LAPACKE_LIB)
+            message(FATAL_ERROR "LAPACKE headers or libraries not found.")
+        endif()
 
+        add_library(lapacke_imported INTERFACE)
+        target_include_directories(lapacke_imported INTERFACE ${LAPACKE_INCLUDE_DIR})
+        target_link_libraries(lapacke_imported INTERFACE ${LAPACKE_LIB} ${LAPACK_LIBRARIES})
+        set(LAPACKE_LINK_TARGET lapacke_imported)
+    endif()
+endif()
 
-# =========== Файлы фреймворка: ============
+# ================= Target Definitions =================
 
-SET(HEADER_FILES
-  # Tests
-  src/lib/tests/generate_svd.h
-  src/lib/tests/SVD_Test.h
-  src/lib/tests/SVD_Test.hpp
-  src/lib/tests/SVD_Test_config.h
-
-  # Parf&Drozdov
-  src/lib/idea1_givref/givens_refinement.h
-  src/lib/idea1_givref/givens_refinement.hpp
-  src/lib/idea2_revjac/reverse_jacobi.h
-  src/lib/idea2_revjac/reverse_jacobi.hpp
-  src/lib/idea3_naive/naive_mrrr/naive_mrrr.h
-  src/lib/idea3_naive/naive_mrrr/naive_mrrr.hpp
-  src/lib/idea3_naive/naive_bidiag_svd/naive_bidiag_svd.h
-  src/lib/idea3_naive/naive_bidiag_svd/naive_bidiag_svd.hpp
-
-  # Legacy
-  src/lib/idea1_givref/legacy/v0_givens_refinement.h
-  src/lib/idea1_givref/legacy/v0_givens_refinement.hpp
-  src/lib/idea2_revjac/legacy/v0_reverse_jacobi.h
-  src/lib/idea2_revjac/legacy/v0_reverse_jacobi.hpp
-  src/lib/idea1_givref/legacy/v1_givens_refinement.h
-  src/lib/idea1_givref/legacy/v1_givens_refinement.hpp
-
-  # Umbrella header
-  src/lib/SVD_project.h
+# Core library
+add_library(svd 
+    src/givens_refinement.cpp
+    src/reverse_jacobi.cpp
+    src/naive_mrrr.cpp
+    src/newton_polar.cpp
+)
+target_include_directories(svd PUBLIC 
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
+)
+target_link_libraries(svd PUBLIC 
+    Eigen3::Eigen 
+    Boost::boost 
+    ${LAPACKE_LINK_TARGET}
 )
 
-SET(SOURCE_FILES
-  # Tests run
-  src/testing.cpp
+# Macro/helper for test executables to reduce repetition
+function(add_svd_test target_name source_file)
+    add_executable(${target_name} ${source_file})
+    target_link_libraries(${target_name} PRIVATE svd)
+endfunction()
 
-  # Parf&Drozdov
-  src/givens_refinement.cpp
-  src/reverse_jacobi.cpp
-  src/naive_mrrr.cpp
-)
-
-# ==========================================
-
-
-# ============= Цели сборки: ===============
-
-# Сборка библиотеки svd (фреймворк)
-add_library(svd ${SOURCE_FILES} ${HEADER_FILES})
-target_link_libraries(svd Eigen3::Eigen lapacke Boost::boost)
-
-# Тестовый исполняемый файл для testing.cpp
-add_executable(svd_test src/testing.cpp)
-target_link_libraries(svd_test PRIVATE svd Eigen3::Eigen lapacke)
-
-# Тестовый исполняемый файл для givens_refinement.cpp (idea 1)
-add_executable(svd_test_givref src/givens_refinement.cpp)
-target_link_libraries(svd_test_givref PRIVATE svd Eigen3::Eigen lapacke)
-
-# Тестовый исполняемый файл для reverse_jacobi.cpp (idea 2)
-add_executable(svd_test_revjac src/reverse_jacobi.cpp)
-target_link_libraries(svd_test_revjac PRIVATE svd Eigen3::Eigen lapacke)
-
- # Сценарий тестирования, описанный в mrrr.cpp  (idea 3)
-add_executable(svd_test_mrrr src/naive_mrrr.cpp)
-target_link_libraries(svd_test_mrrr PRIVATE svd Eigen3::Eigen lapacke)
-
-# ==========================================
-
-
-# ======== Цели установки (TODO): ==========
-# добавить установку фреймворка как библиотеки и поддержку очистки того, что устанавливает фреймворк
+add_svd_test(svd_test src/testing.cpp)
+add_svd_test(svd_test_givref src/givens_refinement.cpp)
+add_svd_test(svd_test_revjac src/reverse_jacobi.cpp)
+add_svd_test(svd_test_mrrr src/naive_mrrr.cpp)
+add_svd_test(svd_test_newton src/newton_polar.cpp)
