@@ -156,3 +156,6 @@ svd_add_test(svd_test testing.cpp)
 svd_add_test(svd_test_givref givens_refinement.cpp)
 svd_add_test(svd_test_revjac reverse_jacobi.cpp)
 svd_add_test(svd_test_golub_kahan golub_kahan.cpp)
+svd_add_test(svd_benchmark svd_benchmark.cpp)
+svd_add_test(svd_benchmark_hdr_clusters svd_benchmark_hdr_clusters.cpp)
+
