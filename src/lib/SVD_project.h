@@ -11,6 +11,8 @@
 #include "golub_kahan/golub_kahan.h"
 #include "iterative_refinement/iterative_refinement.h"
 #include "jacobi/jacobi.h"
+#include "newton_polar/newton_polar.h"
+#include "newton_polar_acceleration/newton_polar_acceleration.h"
 
 // Experimental ideas
 #include "idea1_givref/givens_refinement.h"

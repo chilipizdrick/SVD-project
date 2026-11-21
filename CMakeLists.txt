@@ -92,6 +92,9 @@ set(HEADER_FILES
     src/lib/golub_kahan/golub_kahan.cpp
     src/lib/iterative_refinement/iterative_refinement.h
     src/lib/iterative_refinement/iterative_refinement.cpp
+    src/lib/newton_polar/newton_polar.h
+    src/lib/newton_polar/newton_polar.cpp
+    src/lib/newton_polar_acceleration/newton_polar_acceleration.cpp
 
     # Parfenov's & Drozdov's ideas
     src/lib/idea1_givref/givens_refinement.h
@@ -154,3 +157,5 @@ svd_add_test(svd_test testing.cpp)
 svd_add_test(svd_test_givref givens_refinement.cpp)
 svd_add_test(svd_test_revjac reverse_jacobi.cpp)
 svd_add_test(svd_test_golub_kahan golub_kahan.cpp)
+svd_add_test(svd_test_newton_polar newton_polar.cpp)
+svd_add_test(svd_test_newton_polar_accel newton_polar_acceleration.cpp)
