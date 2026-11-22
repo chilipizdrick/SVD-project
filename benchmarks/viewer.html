@@ -1,0 +1,1627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SVD Benchmark Viewer</title>
+<style>
+  :root {
+    --bg: #0f172a; --panel: #1e293b; --panel-2: #162033; --border: #334155;
+    --text: #e2e8f0; --muted: #94a3b8; --accent: #38bdf8;
+    --good: #22c55e; --warn: #f59e0b; --bad: #ef4444; --chip: #273449;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.45;
+  }
+  header {
+    background: var(--panel); border-bottom: 1px solid var(--border);
+    padding: 12px 20px; display: flex; flex-wrap: wrap; align-items: center;
+    justify-content: space-between; gap: 12px;
+  }
+  header h1 { margin: 0; font-size: 1.05rem; font-weight: 700; }
+  .sub { color: var(--muted); font-size: 0.8rem; }
+  .btn {
+    background: var(--chip); color: var(--text); border: 1px solid var(--border);
+    padding: 5px 11px; border-radius: 5px; cursor: pointer; font-size: 0.82rem;
+  }
+  .btn:hover { border-color: var(--accent); color: #fff; }
+  .btn.primary { background: #0284c7; border-color: #0ea5e9; color: #fff; }
+  .btn.primary:hover { background: #0369a1; }
+  .container { max-width: 1520px; margin: 0 auto; padding: 14px 20px 60px; }
+
+  .dropzone {
+    border: 1px dashed var(--border); border-radius: 8px; padding: 15px;
+    text-align: center; background: var(--panel-2); cursor: pointer;
+    transition: border-color .15s, background .15s; margin-bottom: 12px;
+    font-size: 0.85rem;
+  }
+  .dropzone.drag { border-color: var(--accent); background: rgba(56,189,248,0.08); }
+  .dropzone input { display: none; }
+
+  .banner {
+    padding: 9px 13px; border-radius: 6px; margin-bottom: 12px;
+    font-size: 0.84rem; display: none; align-items: center; gap: 10px;
+  }
+  .banner.warn {
+    background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.45);
+    color: #fcd34d;
+  }
+  .banner.show { display: flex; }
+
+  .card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px 15px; margin-bottom: 12px;
+  }
+  .card h2 {
+    margin: 0 0 10px; font-size: 0.9rem; color: #f8fafc; font-weight: 600;
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  }
+  .note {
+    font-size: 0.8rem; color: var(--muted); margin: 0 0 8px; line-height: 1.4;
+  }
+
+  .controls-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 10px; margin-bottom: 10px;
+  }
+  label.field { display: flex; flex-direction: column; gap: 4px; font-size: 0.76rem; color: var(--muted); }
+  select, input[type="text"], input[type="number"] {
+    background: var(--bg); color: var(--text); border: 1px solid var(--border);
+    border-radius: 5px; padding: 5px 8px; font-size: 0.83rem;
+  }
+  .toggles { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; font-size: 0.81rem; margin-top: 8px; }
+  .toggles label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  .hidden { display: none !important; }
+
+  .chip-row { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin: 5px 0; }
+  .chip-label { font-size: 0.75rem; color: var(--muted); min-width: 102px; }
+  .chip {
+    background: var(--chip); border: 1px solid var(--border); color: var(--muted);
+    padding: 2px 8px; border-radius: 4px; font-size: 0.76rem; cursor: pointer;
+    user-select: none; font-family: ui-monospace, monospace;
+  }
+  .chip.active { background: rgba(56,189,248,0.16); border-color: var(--accent); color: #e0f2fe; }
+  .chip-act {
+    background: transparent; border: 1px solid var(--border); color: var(--muted);
+    padding: 1px 6px; border-radius: 3px; font-size: 0.7rem; cursor: pointer;
+  }
+  .chip-act:hover { border-color: var(--accent); color: #fff; }
+  .filter-toolbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0 8px; }
+  .lang-switch {
+    display: inline-flex; border: 1px solid var(--border); border-radius: 5px; overflow: hidden;
+  }
+  .lang-switch button {
+    background: var(--chip); color: var(--muted); border: none; padding: 5px 9px;
+    font-size: 0.78rem; font-weight: 600; cursor: pointer;
+  }
+  .lang-switch button.active { background: #0284c7; color: #fff; }
+
+  .badge {
+    display: inline-block; padding: 1px 5px; border-radius: 3px;
+    font-size: 0.7rem; font-weight: 600; vertical-align: middle; margin-left: 4px;
+    font-family: ui-monospace, monospace;
+  }
+  .badge.lapack { background: rgba(129,140,248,0.18); color: #c7d2fe; border: 1px solid rgba(129,140,248,0.4); }
+  .badge.serial { background: rgba(148,163,184,0.12); color: #cbd5e1; border: 1px solid rgba(148,163,184,0.28); }
+  .badge.base { background: rgba(56,189,248,0.14); color: #7dd3fc; border: 1px solid rgba(56,189,248,0.38); }
+  .badge.r1 { background: rgba(34,197,94,0.2); color: #86efac; }
+  .badge.r2 { background: rgba(56,189,248,0.18); color: #7dd3fc; }
+  .badge.r3 { background: rgba(245,158,11,0.18); color: #fde68a; }
+
+  .table-wrap { overflow-x: auto; }
+  .table-actions {
+    display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+    margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border);
+  }
+  .table-actions .sub { margin-right: 4px; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  th, td {
+    padding: 6px 9px; border-bottom: 1px solid var(--border);
+    text-align: right; white-space: nowrap;
+  }
+  th:first-child, td:first-child { text-align: left; font-weight: 600; }
+  th { background: var(--panel-2); color: var(--muted); position: sticky; top: 0; font-weight: 600; }
+  td.cell-click { cursor: pointer; font-family: ui-monospace, monospace; }
+  td.cell-click:hover { outline: 1px solid var(--accent); }
+
+  .formula-table td { text-align: left; white-space: normal; }
+  .formula-cell { font-family: "Cambria Math", "STIX Two Math", Georgia, serif; font-size: 0.9rem; color: #f1f5f9; white-space: nowrap !important; }
+  details.ref-details summary {
+    cursor: pointer; font-size: 0.88rem; font-weight: 600; color: #f8fafc;
+    list-style: none; display: flex; justify-content: space-between; align-items: center;
+  }
+  details.ref-details[open] summary { margin-bottom: 10px; }
+
+  .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(460px, 1fr)); gap: 12px; }
+  .svg-box { width: 100%; overflow-x: auto; background: var(--panel-2); border-radius: 6px; padding: 8px; }
+
+  .drawer-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.55); display: none;
+    justify-content: flex-end; z-index: 50;
+  }
+  .drawer-backdrop.open { display: flex; }
+  .drawer {
+    width: min(440px, 95vw); background: var(--panel); border-left: 1px solid var(--border);
+    height: 100%; overflow-y: auto; padding: 16px;
+  }
+  .kv-table td { text-align: left !important; font-family: ui-monospace, monospace; font-size: 0.8rem; }
+  pre.cli-box {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 5px;
+    padding: 9px; overflow-x: auto; font-size: 0.79rem; color: #7dd3fc; margin: 8px 0 0;
+  }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1 data-i18n="title">SVD Benchmark Viewer</h1>
+    <div class="sub" id="datasetMeta" data-i18n="no_dataset">No dataset loaded</div>
+  </div>
+  <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+    <div class="lang-switch" role="group" aria-label="Language">
+      <button id="btnLangEn" type="button">EN</button>
+      <button id="btnLangRu" type="button">RU</button>
+    </div>
+    <button class="btn primary" id="btnClear" data-i18n="clear">Clear</button>
+  </div>
+</header>
+
+<div class="container">
+  <div class="dropzone" id="dropzone">
+    <input type="file" id="fileInput" accept=".jsonl,.json,.txt" multiple />
+    <div id="dropzoneText">Import <code>.jsonl</code> files (drag and drop or click; multiple files merge by coordinate)</div>
+  </div>
+
+  <!-- Metric Definitions & Formulas -->
+  <div class="card">
+    <details class="ref-details" id="metricsRefDetails">
+      <summary>
+        <span data-i18n="metrics_ref_title">Metric Definitions and Formulas</span>
+        <span class="sub" data-i18n="metrics_ref_toggle">expand / collapse</span>
+      </summary>
+      <div class="table-wrap">
+        <table class="formula-table" id="metricsRefTable"></table>
+      </div>
+    </details>
+  </div>
+
+  <div id="mainContent" style="display:none;">
+    <!-- Controls -->
+    <div class="card">
+      <h2>
+        <span data-i18n="slice_and_filter">Slice and Filter</span>
+        <span class="sub" id="matchCount"></span>
+      </h2>
+      <div class="controls-grid">
+        <label class="field" id="wrapMetric"><span data-i18n="metric">Metric</span>
+          <select id="selMetric"></select>
+        </label>
+        <label class="field"><span data-i18n="row_axis">Row Axis</span>
+          <select id="selRow">
+            <option value="solver" selected>solver (algorithm + diagonalizer combined)</option>
+            <option value="algorithm">algorithm</option>
+            <option value="diagonalizer">diagonalizer</option>
+            <option value="matrix_kind">matrix_kind</option>
+            <option value="matrix_size">matrix_size</option>
+            <option value="problem">problem</option>
+            <option value="metric">metric</option>
+          </select>
+        </label>
+        <label class="field"><span data-i18n="col_axis">Column Axis</span>
+          <select id="selCol">
+            <option value="matrix_kind" selected>matrix_kind</option>
+            <option value="problem">problem</option>
+            <option value="matrix_size">matrix_size</option>
+            <option value="solver">solver (algorithm + diagonalizer combined)</option>
+            <option value="algorithm">algorithm</option>
+            <option value="diagonalizer">diagonalizer</option>
+            <option value="metric">metric</option>
+          </select>
+        </label>
+        <label class="field"><span data-i18n="table_split">Table Split (3rd Axis)</span>
+          <select id="selTable">
+            <option value="" selected>none</option>
+            <option value="diagonalizer">diagonalizer</option>
+            <option value="matrix_size">matrix_size</option>
+            <option value="matrix_kind">matrix_kind</option>
+            <option value="problem">problem</option>
+            <option value="algorithm">algorithm</option>
+          </select>
+        </label>
+        <label class="field"><span data-i18n="trial_agg">Trial Aggregation</span>
+          <select id="selTrial">
+            <option value="mean" selected>mean</option>
+            <option value="max">max</option>
+            <option value="min">min</option>
+          </select>
+        </label>
+        <label class="field" id="wrapRankSort"><span data-i18n="rank_sort">Leaderboard Sort</span>
+          <select id="selRankSort">
+            <option value="mean_rank" selected>mean_rank</option>
+            <option value="wins">wins</option>
+            <option value="geomean">geomean_ratio</option>
+            <option value="best">best</option>
+            <option value="worst">worst</option>
+          </select>
+        </label>
+      </div>
+
+      <label class="field" style="margin-bottom:8px;">
+        <span data-i18n="filter_expr">Filter Expression</span>
+        <input type="text" id="txtQuery" placeholder="algo=halley and diag!=two_sided_jacobi" />
+      </label>
+
+      <div class="filter-toolbar">
+        <button class="btn" id="btnSelectAllFilters" type="button" data-i18n="select_all_filters">Select all filters</button>
+        <button class="btn" id="btnDeselectAllFilters" type="button" data-i18n="deselect_all_filters">Deselect all filters</button>
+      </div>
+
+      <div id="chipFilters"></div>
+
+      <div class="toggles">
+        <label><input type="checkbox" id="chkBroadcast" checked /> <span id="lblBroadcast">Broadcast non-polar baselines (<code>diag=none</code>) in diagonalizer splits</span></label>
+        <label><input type="checkbox" id="chkHeatmap" checked /> <span data-i18n="heatmap_toggle">Relative log-scale heatmap</span></label>
+        <label id="wrapLogChart"><input type="checkbox" id="chkLogChart" checked /> <span data-i18n="log_y_toggle">Log Y-axis (bar chart)</span></label>
+      </div>
+    </div>
+
+    <!-- Leaderboard (hidden in multi-metric axis mode) -->
+    <div class="card" id="leaderboardCard">
+      <h2>
+        <span data-i18n="algo_ranking">Algorithm Ranking</span>
+        <span class="sub" data-i18n="dedup_per_problem">Deduplicated per problem</span>
+      </h2>
+      <div class="table-wrap">
+        <table id="leaderboardTable"></table>
+      </div>
+    </div>
+
+    <!-- 2D / 3D Slice Tables -->
+    <div id="sliceTablesContainer"></div>
+
+    <!-- Charts (hidden in multi-metric axis mode) -->
+    <div class="charts-grid" id="chartsGrid">
+      <div class="card">
+        <h2 data-i18n="metric_comparison">Metric Comparison</h2>
+        <div class="svg-box" id="barChartBox"></div>
+      </div>
+      <div class="card">
+        <h2 data-i18n="perf_profile">Performance Profile (Dolan-More)</h2>
+        <p class="note" id="profileNote" data-i18n="perf_profile_note"></p>
+        <div class="svg-box" id="profileChartBox"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Standalone CLI Command Generator (always available) -->
+  <div class="card">
+    <h2>
+      <span data-i18n="cli_builder_title">CLI Command Generator</span>
+      <div style="display:flex; gap:6px;">
+        <button class="btn" id="btnSyncCli" type="button" data-i18n="cli_sync">Sync from viewer filters</button>
+        <button class="btn primary" id="btnCopyCli" type="button" data-i18n="copy">Copy</button>
+      </div>
+    </h2>
+
+    <div id="cliChips"></div>
+
+    <div class="chip-row" style="margin-top:8px;">
+      <span class="chip-label" data-i18n="cli_add_size_label">custom size:</span>
+      <input type="text" id="cliCustomSize" placeholder="e.g. 50x50 or 300x150" style="width:170px;" />
+      <button class="btn" id="btnAddCliSize" type="button" data-i18n="cli_add_size">Add size</button>
+    </div>
+
+    <div class="controls-grid" style="margin-top:10px;">
+      <label class="field"><span data-i18n="cli_trials">Trials</span>
+        <input type="number" id="cliTrials" value="5" min="1" />
+      </label>
+      <label class="field"><span data-i18n="cli_seed">Seed</span>
+        <input type="number" id="cliSeed" value="42" min="0" />
+      </label>
+      <label class="field"><span data-i18n="cli_jobs">Jobs (0 = auto)</span>
+        <input type="number" id="cliJobs" value="0" min="0" />
+      </label>
+      <label class="field"><span data-i18n="cli_output">Output JSONL</span>
+        <input type="text" id="cliOutput" value="benchmark_results.jsonl" />
+      </label>
+      <label class="field"><span data-i18n="cli_query">Extra Query (-q)</span>
+        <input type="text" id="cliExtraQuery" placeholder="optional boolean expr" />
+      </label>
+    </div>
+
+    <div class="toggles">
+      <label><input type="checkbox" id="cliResume" /> <code>--resume</code></label>
+      <label><input type="checkbox" id="cliNestedBlas" /> <code>--allow-nested-blas</code></label>
+    </div>
+
+    <pre class="cli-box" id="cliPreview"></pre>
+  </div>
+</div>
+
+<!-- Cell Inspector Drawer -->
+<div class="drawer-backdrop" id="drawerBackdrop">
+  <div class="drawer">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+      <h2 style="margin:0; font-size:0.95rem;" data-i18n="record_details">Record Details</h2>
+      <button class="btn" id="btnCloseDrawer" data-i18n="close">Close</button>
+    </div>
+    <div id="drawerBody"></div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const METRICS = [
+    {
+      key: "time_ms", sym: "time_ms", directional: true,
+      formula: "t (ms)",
+      en: "Wall-clock execution time in milliseconds",
+      ru: "Время выполнения алгоритма в миллисекундах",
+    },
+    {
+      key: "omega_U", sym: "ω_U", directional: true,
+      formula: "ω<sub>U</sub> = ‖Û*Û − I‖<sub>∞</sub>",
+      en: "Orthonormality deviation of left singular vectors",
+      ru: "Отклонение от ортонормированности левых сингулярных векторов",
+    },
+    {
+      key: "omega_V", sym: "ω_V", directional: true,
+      formula: "ω<sub>V</sub> = ‖V̂*V̂ − I‖<sub>∞</sub>",
+      en: "Orthonormality deviation of right singular vectors",
+      ru: "Отклонение от ортонормированности правых сингулярных векторов",
+    },
+    {
+      key: "r", sym: "r", directional: true,
+      formula: "r = √(Σ<sub>j</sub> (‖f<sub>j</sub>‖² + ‖g<sub>j</sub>‖²)) / ‖A‖<sub>∞</sub>, f<sub>j</sub> = Av<sub>j</sub> − σ<sub>j</sub>u<sub>j</sub>, g<sub>j</sub> = A*u<sub>j</sub> − σ<sub>j</sub>v<sub>j</sub>",
+      en: "Global residual of the two singular-triplet equations",
+      ru: "Общая невязка двух сингулярных уравнений",
+    },
+    {
+      key: "eta", sym: "η", directional: true,
+      formula: "η = max<sub>j</sub> √(‖f<sub>j</sub>‖² + ‖g<sub>j</sub>‖²) / σ<sub>j</sub>",
+      en: "Maximum relative residual of a singular triplet",
+      ru: "Максимальная относительная невязка сингулярной тройки",
+    },
+    {
+      key: "rho", sym: "ρ", directional: true,
+      formula: "ρ = ‖A − UΣV*‖<sub>F</sub> / ‖A‖<sub>F</sub>",
+      en: "Relative backward reconstruction error of matrix A",
+      ru: "Относительная ошибка реконструкции матрицы A",
+    },
+    {
+      key: "kappa", sym: "κ", directional: false,
+      formula: "κ = ‖A‖<sub>2</sub> · ‖A<sup>+</sup>‖<sub>2</sub> = σ<sub>max</sub> / σ<sub>min</sub>",
+      en: "2-norm condition number of matrix A",
+      ru: "Число обусловленности матрицы A",
+    },
+    {
+      key: "delta", sym: "δ", directional: true,
+      formula: "δ = max<sub>j</sub> |σ̂<sub>j</sub> − σ<sub>j</sub>| / σ<sub>j</sub>",
+      en: "Maximum relative error of computed singular values (requires ground truth)",
+      ru: "Относительная ошибка вычисления сингулярных значений (при известном спектре)",
+    },
+    {
+      key: "Delta", sym: "Δ", directional: true,
+      formula: "Δ = ‖Σ̂ − Σ‖<sub>∞</sub> = max<sub>j</sub> |σ̂<sub>j</sub> − σ<sub>j</sub>|",
+      en: "Maximum absolute error of computed singular values (requires ground truth)",
+      ru: "Абсолютная ошибка вычисления сингулярных значений (при известном спектре)",
+    },
+    {
+      key: "log_det", sym: "log_det", directional: false,
+      formula: "Σ<sub>j</sub> ln(σ<sub>j</sub>)",
+      en: "Log-determinant invariant for square non-singular matrices",
+      ru: "Логарифм определителя для квадратных невырожденных матриц",
+    },
+    {
+      key: "sigma_min", sym: "σ_min", directional: false,
+      formula: "σ<sub>min</sub> = min<sub>j</sub> σ<sub>j</sub>",
+      en: "Smallest computed singular value",
+      ru: "Наименьшее вычисленное сингулярное значение",
+    },
+    {
+      key: "sigma_max", sym: "σ_max", directional: false,
+      formula: "σ<sub>max</sub> = max<sub>j</sub> σ<sub>j</sub>",
+      en: "Largest computed singular value",
+      ru: "Наибольшее вычисленное сингулярное значение",
+    },
+  ];
+  const METRIC_MAP = Object.fromEntries(METRICS.map(m => [m.key, m]));
+  const LEGACY_METRIC_ALIASES = {
+    resid_r: "r", rel_eta: "eta", recon_rho: "rho",
+    cond_num: "kappa", rel_err_s: "delta", abs_err_s: "Delta",
+  };
+
+  const DEFAULT_CATALOG = {
+    algorithm: ["halley", "dgesdd", "dgesvd", "dbdsvdx", "eigen_jacobi"],
+    diagonalizer: ["tridiag_dc", "two_sided_jacobi", "cholesky_onesided", "qdwh_eig", "none"],
+    matrix_kind: [
+      "twin_clusters", "tight_10_clusters", "wide_hdr", "lauchli", "golub_int",
+      "kahan", "hilbert", "jordan", "golub_kahan", "clustered_hdr", "random_uniform"
+    ],
+    matrix_size: ["100x100", "200x200", "500x500"],
+  };
+
+  const I18N = {
+    en: {
+      title: "SVD Benchmark Viewer",
+      no_dataset: "No dataset loaded",
+      clear: "Clear",
+      dropzone_html: 'Import <code>.jsonl</code> files (drag and drop or click; multiple files merge by coordinate)',
+      metrics_ref_title: "Metric Definitions and Formulas",
+      metrics_ref_toggle: "expand / collapse",
+      ref_col_sym: "Symbol",
+      ref_col_formula: "Formula",
+      ref_col_desc: "Definition",
+      slice_and_filter: "Slice and Filter",
+      metric: "Metric",
+      row_axis: "Row Axis",
+      col_axis: "Column Axis",
+      table_split: "Table Split (3rd Axis)",
+      trial_agg: "Trial Aggregation",
+      rank_sort: "Leaderboard Sort",
+      filter_expr: "Filter Expression",
+      select_all_filters: "Select all filters",
+      deselect_all_filters: "Deselect all filters",
+      all_short: "All",
+      none_short: "None",
+      broadcast_html: 'Broadcast non-polar baselines (<code>diag=none</code>) in diagonalizer splits',
+      heatmap_toggle: "Relative log-scale heatmap",
+      log_y_toggle: "Log Y-axis (bar chart)",
+      algo_ranking: "Algorithm Ranking",
+      dedup_per_problem: "Deduplicated per problem",
+      metric_comparison: "Metric Comparison",
+      perf_profile: "Performance Profile (Dolan-More)",
+      perf_profile_note: "Fraction of problems where a method is within factor τ of the best method on each problem: y(τ) = P(val / min_val ≤ τ). Higher and further-left curves indicate stronger overall performance across the filtered problem set.",
+      cli_builder_title: "CLI Command Generator",
+      cli_sync: "Sync from viewer filters",
+      cli_add_size_label: "custom size:",
+      cli_add_size: "Add size",
+      cli_trials: "Trials",
+      cli_seed: "Seed",
+      cli_jobs: "Jobs (0 = auto)",
+      cli_output: "Output JSONL",
+      cli_query: "Extra Query (-q)",
+      copy: "Copy",
+      record_details: "Record Details",
+      close: "Close",
+      records_count: n => `${n} records`,
+      records_active: (a, b) => `${a} / ${b} records`,
+      th_rank: "Rank",
+      th_solver: "solver (algorithm + diagonalizer)",
+      opt_solver_combined: "solver (algorithm + diagonalizer combined)",
+      th_concurrency: "Concurrency",
+      th_wins: "Wins",
+      th_mean_rank: "Mean Rank",
+      th_geomean: "GeoMean Ratio",
+      th_best: "Best",
+      th_worst: "Worst",
+      serial: "serial",
+      baseline: "baseline",
+      metrics_table: "Metrics Table",
+      export_table: "Export table:",
+      export_all_tables: n => `Export all ${n} tables:`,
+      no_data: "No data.",
+      no_positive: "No positive finite values.",
+      tau_axis: "Ratio to best (τ)",
+      record_of: n => `Record 1 of ${n}`,
+      metrics_heading: "Metrics",
+      axis_labels: {
+        algorithm: "algorithm",
+        diagonalizer: "diagonalizer",
+        matrix_kind: "matrix_kind",
+        matrix_size: "matrix_size",
+        concurrency_model: "concurrency",
+        metric: "metrics",
+      },
+      opt_none: "none",
+      opt_mean: "mean",
+      opt_max: "max",
+      opt_min: "min",
+      opt_trial: tr => `trial ${tr}`,
+    },
+    ru: {
+      title: "Просмотр результатов бенчмарка SVD",
+      no_dataset: "Данные не загружены",
+      clear: "Очистить",
+      dropzone_html: 'Импорт файлов <code>.jsonl</code> (перетащите сюда или выберите; несколько файлов объединяются по координатам)',
+      metrics_ref_title: "Обозначения и формулы метрик",
+      metrics_ref_toggle: "развернуть / свернуть",
+      ref_col_sym: "Символ",
+      ref_col_formula: "Формула",
+      ref_col_desc: "Описание",
+      slice_and_filter: "Срез и фильтрация",
+      metric: "Метрика",
+      row_axis: "Ось строк",
+      col_axis: "Ось столбцов",
+      table_split: "Разбиение на таблицы (3-я ось)",
+      trial_agg: "Агрегация по запускам",
+      rank_sort: "Сортировка рейтинга",
+      filter_expr: "Выражение фильтрации",
+      select_all_filters: "Выбрать все фильтры",
+      deselect_all_filters: "Снять все фильтры",
+      all_short: "Все",
+      none_short: "Нет",
+      broadcast_html: 'Дублировать базовые алгоритмы (<code>diag=none</code>) в разбиении по диагонализаторам',
+      heatmap_toggle: "Относительная логарифмическая тепловая карта",
+      log_y_toggle: "Логарифмическая ось Y (гистограмма)",
+      algo_ranking: "Рейтинг алгоритмов",
+      dedup_per_problem: "Без дублирования по задачам",
+      metric_comparison: "Сравнение по метрике",
+      perf_profile: "Профиль производительности (Долан-Море)",
+      perf_profile_note: "Доля задач, на которых метод не хуже лучшего более чем в τ раз: y(τ) = P(val / min_val ≤ τ). Чем выше и левее проходит кривая, тем лучше и стабильнее метод на выбранном наборе задач.",
+      cli_builder_title: "Генератор CLI-команды",
+      cli_sync: "Синхронизировать с фильтрами",
+      cli_add_size_label: "свой размер:",
+      cli_add_size: "Добавить",
+      cli_trials: "Запусков",
+      cli_seed: "Seed",
+      cli_jobs: "Потоки (0 = авто)",
+      cli_output: "Файл JSONL",
+      cli_query: "Доп. запрос (-q)",
+      copy: "Копировать",
+      record_details: "Детали записи",
+      close: "Закрыть",
+      records_count: n => `Записей: ${n}`,
+      records_active: (a, b) => `${a} / ${b} зап.`,
+      th_rank: "Место",
+      th_solver: "solver (алгоритм + диагонализатор)",
+      opt_solver_combined: "solver (алгоритм + диагонализатор вместе)",
+      th_concurrency: "Параллелизм",
+      th_wins: "Победы",
+      th_mean_rank: "Ср. место",
+      th_geomean: "Геом. отн.",
+      th_best: "Лучшее",
+      th_worst: "Худшее",
+      serial: "1 поток",
+      baseline: "базовый",
+      metrics_table: "Таблица метрик",
+      export_table: "Экспорт таблицы:",
+      export_all_tables: n => `Экспорт всех таблиц (${n}):`,
+      no_data: "Нет данных.",
+      no_positive: "Нет положительных конечных значений.",
+      tau_axis: "Отношение к лучшему (τ)",
+      record_of: n => `Запись 1 из ${n}`,
+      metrics_heading: "Метрики",
+      axis_labels: {
+        algorithm: "алгоритм",
+        diagonalizer: "диагонализатор",
+        matrix_kind: "тип матрицы",
+        matrix_size: "размер",
+        concurrency_model: "параллелизм",
+        metric: "метрики",
+      },
+      opt_none: "нет",
+      opt_mean: "среднее",
+      opt_max: "максимум",
+      opt_min: "минимум",
+      opt_trial: tr => `запуск ${tr}`,
+    },
+  };
+
+  let currentLang = "en";
+  try {
+    const saved = localStorage.getItem("svd_bench_lang");
+    if (saved === "ru" || saved === "en") currentLang = saved;
+  } catch (_) {}
+  const t = key => I18N[currentLang][key];
+
+  const PALETTE = ["#38bdf8","#22c55e","#f59e0b","#f472b6","#a78bfa","#fb7185","#2dd4bf","#facc15"];
+
+  const state = {
+    headers: [],
+    records: [],
+    chipState: {
+      algorithm: new Set(),
+      diagonalizer: new Set(),
+      matrix_kind: new Set(),
+      matrix_size: new Set(),
+      concurrency_model: new Set(),
+      metric: new Set(METRICS.map(m => m.key)),
+    },
+    allVals: {
+      algorithm: [],
+      diagonalizer: [],
+      matrix_kind: [],
+      matrix_size: [],
+      concurrency_model: [],
+      metric: METRICS.map(m => m.key),
+    },
+    cliCatalog: {
+      algorithm: [...DEFAULT_CATALOG.algorithm],
+      diagonalizer: [...DEFAULT_CATALOG.diagonalizer],
+      matrix_kind: [...DEFAULT_CATALOG.matrix_kind],
+      matrix_size: [...DEFAULT_CATALOG.matrix_size],
+    },
+    cliSelected: {
+      algorithm: new Set(DEFAULT_CATALOG.algorithm),
+      diagonalizer: new Set(DEFAULT_CATALOG.diagonalizer),
+      matrix_kind: new Set(DEFAULT_CATALOG.matrix_kind),
+      matrix_size: new Set(["100x100", "200x200", "500x500"]),
+    },
+    trials: [],
+    lastTables: [],
+  };
+
+  const $ = id => document.getElementById(id);
+
+  function metricSym(key) {
+    return METRIC_MAP[key]?.sym || key;
+  }
+
+  function populateMetricSelect() {
+    const sel = $("selMetric");
+    const prev = sel.value || "omega_U";
+    sel.innerHTML = "";
+    METRICS.forEach(m => {
+      const opt = document.createElement("option");
+      opt.value = m.key;
+      opt.textContent = `${m.sym} (${m.key})`;
+      sel.appendChild(opt);
+    });
+    sel.value = prev;
+  }
+
+  function renderMetricsRef() {
+    const tbl = $("metricsRefTable");
+    tbl.innerHTML = `<thead><tr>
+      <th>${t("ref_col_sym")}</th><th>${t("ref_col_formula")}</th><th>${t("ref_col_desc")}</th>
+    </tr></thead><tbody>` + METRICS.map(m => `
+      <tr>
+        <td style="font-family:ui-monospace,monospace;">${m.sym} <span class="sub">(${m.key})</span></td>
+        <td class="formula-cell">${m.formula}</td>
+        <td>${m[currentLang]}</td>
+      </tr>`).join("") + `</tbody>`;
+  }
+
+  function diagSolverKey(r) {
+    return (!r.diagonalizer || r.diagonalizer === "none") ? r.algorithm : `${r.algorithm}/${r.diagonalizer}`;
+  }
+  function problemKey(r) { return `${r.matrix_kind} (${r.matrix_size})`; }
+  function axisVal(r, axis) {
+    if (axis === "diag_solver" || axis === "solver") return diagSolverKey(r);
+    if (axis === "problem") return problemKey(r);
+    return String(r[axis] ?? "");
+  }
+  function fmtVal(metric, v) {
+    if (v === null || v === undefined || !Number.isFinite(v)) return "N/A";
+    if (metric === "time_ms") return v.toFixed(2);
+    return v.toExponential(2);
+  }
+  function concBadge(cm) {
+    if (cm === "lapack_internal") return `<span class="badge lapack">LAPACK</span>`;
+    if (cm === "lapack_diag") return `<span class="badge lapack">LAPACK-diag</span>`;
+    return `<span class="badge serial">${t("serial")}</span>`;
+  }
+
+  function normalizeMetrics(raw) {
+    const out = {};
+    if (!raw || typeof raw !== "object") return out;
+    for (const [k, v] of Object.entries(raw)) {
+      const ck = LEGACY_METRIC_ALIASES[k] || k;
+      out[ck] = v;
+    }
+    return out;
+  }
+
+  function globMatch(pat, txt) {
+    const esc = pat.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*").replace(/\?/g, ".");
+    return new RegExp("^" + esc + "$", "i").test(txt);
+  }
+
+  function evalQuery(expr, r) {
+    if (!expr || !expr.trim()) return true;
+    const normField = f => ({
+      algo: "algorithm", algorithm: "algorithm", diag: "diagonalizer", diagonalizer: "diagonalizer",
+      matrix: "matrix_kind", matrix_kind: "matrix_kind", kind: "matrix_kind",
+      size: "matrix_size", matrix_size: "matrix_size", concurrency: "concurrency_model",
+      concurrency_model: "concurrency_model", status: "status", trial: "trial",
+      parallel: "internally_parallel"
+    })[f.toLowerCase()] || f.toLowerCase();
+
+    const orParts = expr.split(/\s+(?:or|\|\|?)\s+/i);
+    return orParts.some(orPart => {
+      const andParts = orPart.split(/\s+(?:and|&&?)\s+/i);
+      return andParts.every(raw => {
+        let s = raw.trim().replace(/^\(+|\)+$/g, "").trim();
+        let neg = false;
+        if (/^(?:not\s+|!)/i.test(s)) { neg = true; s = s.replace(/^(?:not\s+|!)/i, "").trim(); }
+        let m;
+        if ((m = s.match(/^(\w+)\s+not\s+in\s*\(([^)]+)\)$/i))) {
+          const fv = String(r[normField(m[1])] ?? "");
+          const list = m[2].split(",").map(x => x.trim());
+          const ok = !list.some(v => globMatch(v, fv));
+          return neg ? !ok : ok;
+        }
+        if ((m = s.match(/^(\w+)\s+in\s*\(([^)]+)\)$/i))) {
+          const fv = String(r[normField(m[1])] ?? "");
+          const list = m[2].split(",").map(x => x.trim());
+          const ok = list.some(v => globMatch(v, fv));
+          return neg ? !ok : ok;
+        }
+        if ((m = s.match(/^(\w+)\s*(!=|==|=)\s*(.+)$/))) {
+          const fv = String(r[normField(m[1])] ?? "");
+          const tv = m[3].trim().replace(/^['"]|['"]$/g, "");
+          const eq = globMatch(tv, fv);
+          const ok = (m[2] === "!=") ? !eq : eq;
+          return neg ? !ok : ok;
+        }
+        return true;
+      });
+    });
+  }
+
+  function coordKey(r) {
+    return `${r.algorithm}|${r.diagonalizer}|${r.matrix_kind}|${r.matrix_size}|${r.dtype}|${r.trial}`;
+  }
+
+  function loadJsonlText(text, filename) {
+    const byKey = new Map();
+    state.records.forEach(r => byKey.set(coordKey(r), r));
+    for (const line of text.split(/\r?\n/)) {
+      if (!line.trim()) continue;
+      try {
+        const obj = JSON.parse(line);
+        if (obj.record_type === "run_header") {
+          obj._file = filename;
+          state.headers.push(obj);
+        } else if (obj.record_type === "result") {
+          obj.metrics = normalizeMetrics(obj.metrics);
+          byKey.set(coordKey(obj), obj);
+        }
+      } catch (_) {}
+    }
+    state.records = Array.from(byKey.values());
+    rebuildAxisIndex();
+    renderAll();
+  }
+
+  function rebuildAxisIndex() {
+    for (const ax of ["algorithm", "diagonalizer", "matrix_kind", "matrix_size", "concurrency_model"]) {
+      const vals = Array.from(new Set(state.records.map(r => String(r[ax] ?? "")))).sort();
+      state.allVals[ax] = vals;
+      state.chipState[ax] = new Set(vals);
+      // Merge newly discovered values into CLI catalog
+      if (state.cliCatalog[ax]) {
+        vals.forEach(v => { if (!state.cliCatalog[ax].includes(v)) state.cliCatalog[ax].push(v); });
+      }
+    }
+    state.trials = Array.from(new Set(state.records.map(r => r.trial))).sort((a, b) => a - b);
+
+    const selTrial = $("selTrial");
+    while (selTrial.options.length > 3) selTrial.remove(3);
+    state.trials.forEach(tr => {
+      const opt = document.createElement("option");
+      opt.value = `exact:${tr}`; opt.textContent = t("opt_trial")(tr);
+      selTrial.appendChild(opt);
+    });
+    renderChips();
+    renderCliChips();
+  }
+
+  function isMetricAxisMode() {
+    return $("selRow").value === "metric" || $("selCol").value === "metric";
+  }
+
+  function renderChips() {
+    const host = $("chipFilters");
+    host.innerHTML = "";
+    const labels = t("axis_labels");
+    const metricMode = isMetricAxisMode();
+    for (const [ax, vals] of Object.entries(state.allVals)) {
+      if (ax === "metric" && !metricMode) continue;
+      const row = document.createElement("div");
+      row.className = "chip-row";
+      const lbl = document.createElement("span");
+      lbl.className = "chip-label"; lbl.textContent = labels[ax] + ":";
+      row.appendChild(lbl);
+
+      const btnAll = document.createElement("button");
+      btnAll.type = "button"; btnAll.className = "chip-act"; btnAll.textContent = t("all_short");
+      btnAll.onclick = () => { state.chipState[ax] = new Set(vals); renderAll(); };
+      row.appendChild(btnAll);
+
+      const btnNone = document.createElement("button");
+      btnNone.type = "button"; btnNone.className = "chip-act"; btnNone.textContent = t("none_short");
+      btnNone.onclick = () => { state.chipState[ax] = new Set(); renderAll(); };
+      row.appendChild(btnNone);
+
+      vals.forEach(v => {
+        const ch = document.createElement("span");
+        ch.className = "chip" + (state.chipState[ax].has(v) ? " active" : "");
+        ch.textContent = (ax === "metric") ? metricSym(v) : v;
+        if (ax === "metric") ch.title = `${v}: ${METRIC_MAP[v]?.[currentLang] || ""}`;
+        ch.onclick = () => {
+          if (state.chipState[ax].has(v)) state.chipState[ax].delete(v);
+          else state.chipState[ax].add(v);
+          ch.classList.toggle("active");
+          renderAll();
+        };
+        row.appendChild(ch);
+      });
+      host.appendChild(row);
+    }
+  }
+
+  function renderCliChips() {
+    const host = $("cliChips");
+    host.innerHTML = "";
+    const labels = t("axis_labels");
+    for (const ax of ["algorithm", "diagonalizer", "matrix_kind", "matrix_size"]) {
+      const vals = state.cliCatalog[ax];
+      const row = document.createElement("div");
+      row.className = "chip-row";
+      const lbl = document.createElement("span");
+      lbl.className = "chip-label"; lbl.textContent = labels[ax] + ":";
+      row.appendChild(lbl);
+
+      const btnAll = document.createElement("button");
+      btnAll.type = "button"; btnAll.className = "chip-act"; btnAll.textContent = t("all_short");
+      btnAll.onclick = () => { state.cliSelected[ax] = new Set(vals); renderCliChips(); renderCliPreview(); };
+      row.appendChild(btnAll);
+
+      const btnNone = document.createElement("button");
+      btnNone.type = "button"; btnNone.className = "chip-act"; btnNone.textContent = t("none_short");
+      btnNone.onclick = () => { state.cliSelected[ax] = new Set(); renderCliChips(); renderCliPreview(); };
+      row.appendChild(btnNone);
+
+      vals.forEach(v => {
+        const ch = document.createElement("span");
+        ch.className = "chip" + (state.cliSelected[ax].has(v) ? " active" : "");
+        ch.textContent = v;
+        ch.onclick = () => {
+          if (state.cliSelected[ax].has(v)) state.cliSelected[ax].delete(v);
+          else state.cliSelected[ax].add(v);
+          ch.classList.toggle("active");
+          renderCliPreview();
+        };
+        row.appendChild(ch);
+      });
+      host.appendChild(row);
+    }
+  }
+
+  function renderCliPreview() {
+    const parts = ["./build/svd_bench run"];
+    const algos = state.cliCatalog.algorithm.filter(v => state.cliSelected.algorithm.has(v));
+    const diags = state.cliCatalog.diagonalizer.filter(v => state.cliSelected.diagonalizer.has(v));
+    const mats = state.cliCatalog.matrix_kind.filter(v => state.cliSelected.matrix_kind.has(v));
+    const sizes = state.cliCatalog.matrix_size.filter(v => state.cliSelected.matrix_size.has(v));
+
+    if (algos.length && algos.length < state.cliCatalog.algorithm.length) parts.push(`--algo ${algos.join(",")}`);
+    if (diags.length && diags.length < state.cliCatalog.diagonalizer.length) parts.push(`--diag ${diags.join(",")}`);
+    if (mats.length && mats.length < state.cliCatalog.matrix_kind.length) parts.push(`--matrix ${mats.join(",")}`);
+    if (sizes.length) parts.push(`--size ${sizes.join(",")}`);
+
+    const trials = Number($("cliTrials").value);
+    if (Number.isFinite(trials) && trials > 0) parts.push(`--trials ${trials}`);
+    const seed = $("cliSeed").value.trim();
+    if (seed !== "") parts.push(`--seed ${seed}`);
+    const jobs = Number($("cliJobs").value);
+    if (Number.isFinite(jobs) && jobs > 0) parts.push(`-j ${jobs}`);
+
+    const q = $("cliExtraQuery").value.trim();
+    if (q) parts.push(`-q "${q.replace(/"/g, '\\"')}"`);
+    if ($("cliResume").checked) parts.push("--resume");
+    if ($("cliNestedBlas").checked) parts.push("--allow-nested-blas");
+
+    const out = $("cliOutput").value.trim() || "benchmark_results.jsonl";
+    parts.push(`-o ${out}`);
+    $("cliPreview").textContent = parts.join(" ");
+  }
+
+  function getFilteredRecords() {
+    const q = $("txtQuery").value;
+    const tmode = $("selTrial").value;
+    return state.records.filter(r => {
+      for (const ax of ["algorithm", "diagonalizer", "matrix_kind", "matrix_size", "concurrency_model"]) {
+        if (!state.chipState[ax].has(String(r[ax] ?? ""))) return false;
+      }
+      if (tmode.startsWith("exact:") && r.trial !== Number(tmode.slice(6))) return false;
+      return evalQuery(q, r);
+    });
+  }
+
+  function aggTrials(vals, mode) {
+    const ok = vals.filter(v => v !== null && v !== undefined && Number.isFinite(v));
+    if (!ok.length) return NaN;
+    if (mode === "max") return Math.max(...ok);
+    if (mode === "min") return Math.min(...ok);
+    return ok.reduce((a, b) => a + b, 0) / ok.length;
+  }
+
+  function heatBg(val, best) {
+    if (!Number.isFinite(val) || !Number.isFinite(best)) return "";
+    const ratio = Math.max(1, Math.max(val, 1e-30) / Math.max(best, 1e-30));
+    const logR = Math.log10(ratio);
+    if (logR < 0.05) return "rgba(34,197,94,0.18)";
+    if (logR < 1.0) return "rgba(56,189,248,0.10)";
+    if (logR < 2.5) return "rgba(245,158,11,0.16)";
+    return "rgba(239,68,68,0.22)";
+  }
+
+  function updateModeVisibility() {
+    const metricMode = isMetricAxisMode();
+    $("wrapMetric").classList.toggle("hidden", metricMode);
+    $("wrapRankSort").classList.toggle("hidden", metricMode);
+    $("wrapLogChart").classList.toggle("hidden", metricMode);
+    $("leaderboardCard").classList.toggle("hidden", metricMode);
+    $("chartsGrid").classList.toggle("hidden", metricMode);
+  }
+
+  function applyLanguage() {
+    document.documentElement.lang = currentLang;
+    document.title = t("title");
+    $("btnLangEn").classList.toggle("active", currentLang === "en");
+    $("btnLangRu").classList.toggle("active", currentLang === "ru");
+    document.querySelectorAll("[data-i18n]").forEach(el => {
+      const key = el.getAttribute("data-i18n");
+      if (typeof I18N[currentLang][key] === "string") el.textContent = I18N[currentLang][key];
+    });
+    $("dropzoneText").innerHTML = t("dropzone_html");
+    $("lblBroadcast").innerHTML = t("broadcast_html");
+    const selTable = $("selTable");
+    if (selTable.options.length > 0) selTable.options[0].textContent = t("opt_none");
+    for (const selId of ["selRow", "selCol"]) {
+      const opt = Array.from($(selId).options).find(o => o.value === "solver");
+      if (opt) opt.textContent = t("opt_solver_combined");
+    }
+    const selTrial = $("selTrial");
+    if (selTrial.options.length >= 3) {
+      selTrial.options[0].textContent = t("opt_mean");
+      selTrial.options[1].textContent = t("opt_max");
+      selTrial.options[2].textContent = t("opt_min");
+      for (let i = 3; i < selTrial.options.length; i++) {
+        selTrial.options[i].textContent = t("opt_trial")(selTrial.options[i].value.slice(6));
+      }
+    }
+    renderMetricsRef();
+    renderCliChips();
+    renderCliPreview();
+    if (!state.records.length) $("datasetMeta").textContent = t("no_dataset");
+    else renderAll();
+  }
+
+  function renderAll() {
+    if (!state.records.length) {
+      $("mainContent").style.display = "none";
+      return;
+    }
+    $("mainContent").style.display = "block";
+    updateModeVisibility();
+    renderChips();
+
+    const lastHdr = state.headers[state.headers.length - 1];
+    $("datasetMeta").textContent =
+      t("records_count")(state.records.length) +
+      (lastHdr ? ` | seed=${lastHdr.seed} | jobs=${lastHdr.jobs}/${lastHdr.hardware_concurrency}` : "");
+
+    const filtered = getFilteredRecords();
+    const metric = $("selMetric").value;
+    const tmode = $("selTrial").value;
+    const metricMode = isMetricAxisMode();
+    $("matchCount").textContent = t("records_active")(filtered.length, state.records.length);
+
+    const tables = renderSliceTables(filtered, metric, tmode);
+    state.lastTables = tables;
+
+    if (!metricMode) {
+      renderLeaderboard(filtered, metric);
+      renderBarChart(tables, metric);
+      renderProfileChart(filtered, metric);
+    }
+  }
+
+  function renderLeaderboard(filtered, metric) {
+    const byProb = new Map();
+    for (const r of filtered) {
+      if (r.status !== "ok" || !Number.isFinite(r.metrics?.[metric])) continue;
+      const pk = problemKey(r), sk = diagSolverKey(r);
+      if (!byProb.has(pk)) byProb.set(pk, new Map());
+      const pm = byProb.get(pk);
+      if (!pm.has(sk)) pm.set(sk, { vals: [], cm: r.concurrency_model });
+      const acc = pm.get(sk);
+      acc.vals.push(r.metrics[metric]);
+    }
+
+    const totals = new Map();
+    for (const [, pm] of byProb) {
+      const arr = [];
+      for (const [sk, acc] of pm) {
+        const m = aggTrials(acc.vals, "mean");
+        if (Number.isFinite(m)) arr.push({ sk, m, cm: acc.cm });
+      }
+      arr.sort((a, b) => a.m - b.m);
+      if (!arr.length) continue;
+      const bestP = Math.max(arr[0].m, 1e-30);
+      arr.forEach((item, idx) => {
+        if (!totals.has(item.sk)) {
+          totals.set(item.sk, { sk: item.sk, cm: item.cm, probs: 0, wins: 0, rankSum: 0, logRatio: 0, best: Infinity, worst: -Infinity });
+        }
+        const tot = totals.get(item.sk);
+        tot.probs += 1;
+        tot.rankSum += idx + 1;
+        if (idx === 0) tot.wins += 1;
+        tot.logRatio += Math.log(Math.max(1, Math.max(item.m, 1e-30) / bestP));
+        if (item.m < tot.best) tot.best = item.m;
+        if (item.m > tot.worst) tot.worst = item.m;
+      });
+    }
+
+    const rows = Array.from(totals.values()).map(tot => ({
+      ...tot,
+      meanRank: tot.rankSum / tot.probs,
+      geoRatio: Math.exp(tot.logRatio / tot.probs),
+    }));
+
+    const sortKey = $("selRankSort").value;
+    rows.sort((a, b) => {
+      if (sortKey === "wins") return b.wins - a.wins || a.meanRank - b.meanRank;
+      if (sortKey === "geomean") return a.geoRatio - b.geoRatio;
+      if (sortKey === "best") return a.best - b.best;
+      if (sortKey === "worst") return a.worst - b.worst;
+      return a.meanRank - b.meanRank || a.geoRatio - b.geoRatio;
+    });
+
+    const tbl = $("leaderboardTable");
+    tbl.innerHTML = `<thead><tr>
+      <th>${t("th_rank")}</th><th>${t("th_solver")}</th><th>${t("th_concurrency")}</th><th>${t("th_wins")}</th>
+      <th>${t("th_mean_rank")}</th><th>${t("th_geomean")}</th><th>${t("th_best")}</th><th>${t("th_worst")}</th>
+    </tr></thead><tbody>` + rows.map((r, i) => `
+      <tr>
+        <td><span class="badge ${i===0?'r1':i===1?'r2':i===2?'r3':'serial'}">#${i+1}</span></td>
+        <td style="text-align:left;">${r.sk}</td>
+        <td>${concBadge(r.cm)}</td>
+        <td>${r.wins}/${r.probs}</td>
+        <td>${r.meanRank.toFixed(2)}</td>
+        <td>${r.geoRatio.toFixed(2)}x</td>
+        <td style="font-family:ui-monospace,monospace;">${fmtVal(metric, r.best)}</td>
+        <td style="font-family:ui-monospace,monospace;">${fmtVal(metric, r.worst)}</td>
+      </tr>`).join("") + `</tbody>`;
+  }
+
+  function renderSliceTables(filtered, metric, tmode) {
+    const rowAx = $("selRow").value;
+    const colAx = $("selCol").value;
+    const tblAx = $("selTable").value;
+    const broadcast = $("chkBroadcast").checked;
+    const useHeat = $("chkHeatmap").checked;
+    const splitByDiag = (tblAx === "diagonalizer");
+    const rowIsMetric = (rowAx === "metric");
+    const colIsMetric = (colAx === "metric");
+    const activeMetrics = METRICS.map(m => m.key).filter(k => state.chipState.metric.has(k));
+
+    let tableKeys = [""];
+    if (tblAx) {
+      tableKeys = Array.from(new Set(filtered.map(r => axisVal(r, tblAx)))).sort();
+      if (broadcast && splitByDiag) {
+        tableKeys = tableKeys.filter(k => k !== "none");
+        if (!tableKeys.length) tableKeys = ["none"];
+      }
+    }
+
+    const host = $("sliceTablesContainer");
+    host.innerHTML = "";
+    const outTables = [];
+
+    for (const tk of tableKeys) {
+      const rowSet = new Set(rowIsMetric ? activeMetrics : []);
+      const colSet = new Set(colIsMetric ? activeMetrics : []);
+      const buckets = new Map();
+
+      for (const r of filtered) {
+        let isBc = false;
+        if (tblAx) {
+          const rtk = axisVal(r, tblAx);
+          if (rtk !== tk) {
+            if (broadcast && splitByDiag && rtk === "none") isBc = true;
+            else continue;
+          }
+        }
+        if (colIsMetric && !rowIsMetric) {
+          const rk = axisVal(r, rowAx) + (isBc ? " [baseline]" : "");
+          rowSet.add(rk);
+          for (const mk of activeMetrics) {
+            const key = rk + "||" + mk;
+            if (!buckets.has(key)) buckets.set(key, { recs: [], isBc, cm: r.concurrency_model });
+            buckets.get(key).recs.push(r);
+          }
+        } else if (rowIsMetric && !colIsMetric) {
+          const ck = axisVal(r, colAx) + (isBc ? " [baseline]" : "");
+          colSet.add(ck);
+          for (const mk of activeMetrics) {
+            const key = mk + "||" + ck;
+            if (!buckets.has(key)) buckets.set(key, { recs: [], isBc, cm: r.concurrency_model });
+            buckets.get(key).recs.push(r);
+          }
+        } else {
+          const rk = axisVal(r, rowAx) + (isBc ? " [baseline]" : "");
+          const ck = axisVal(r, colAx);
+          rowSet.add(rk); colSet.add(ck);
+          const key = rk + "||" + ck;
+          if (!buckets.has(key)) buckets.set(key, { recs: [], isBc, cm: r.concurrency_model });
+          buckets.get(key).recs.push(r);
+        }
+      }
+
+      const rows = Array.from(rowSet);
+      const cols = Array.from(colSet);
+      const cellMetric = (ri, ci) => colIsMetric ? cols[ci] : (rowIsMetric ? rows[ri] : metric);
+
+      const grid = rows.map((rk, ri) => cols.map((ck, ci) => {
+        const b = buckets.get(rk + "||" + ck);
+        const mk = cellMetric(ri, ci);
+        if (!b) return { val: NaN, mk, recs: [], rank: 0, isBc: false, cm: "serial" };
+        const vals = b.recs.map(x => x.metrics?.[mk]);
+        return { val: aggTrials(vals, tmode), mk, recs: b.recs, rank: 0, isBc: b.isBc, cm: b.cm };
+      }));
+
+      const bestRef = rows.map(() => cols.map(() => NaN));
+      if (rowIsMetric && !colIsMetric) {
+        rows.forEach((mk, ri) => {
+          if (!METRIC_MAP[mk]?.directional) return;
+          const arr = cols.map((_, ci) => ({ ci, v: grid[ri][ci].val })).filter(x => Number.isFinite(x.v));
+          arr.sort((a, b) => a.v - b.v);
+          arr.forEach((x, idx) => { grid[ri][x.ci].rank = idx + 1; });
+          if (arr.length) cols.forEach((_, ci) => { bestRef[ri][ci] = arr[0].v; });
+        });
+      } else {
+        cols.forEach((ck, ci) => {
+          if (colIsMetric && !METRIC_MAP[ck]?.directional) return;
+          const arr = rows.map((_, ri) => ({ ri, v: grid[ri][ci].val })).filter(x => Number.isFinite(x.v));
+          arr.sort((a, b) => a.v - b.v);
+          arr.forEach((x, idx) => { grid[x.ri][ci].rank = idx + 1; });
+          if (arr.length) rows.forEach((_, ri) => { bestRef[ri][ci] = arr[0].v; });
+        });
+      }
+
+      const mDisp = metricSym(metric);
+      const title = (rowIsMetric || colIsMetric)
+        ? (tblAx ? `${tblAx} = ${tk} (${tmode})` : `${t("metrics_table")} (${tmode})`)
+        : (tblAx ? `${tblAx} = ${tk} | ${mDisp} (${tmode})` : `${mDisp} (${tmode})`);
+      const tblObj = { title, rowAx, rows, cols, grid, rowIsMetric, colIsMetric };
+      outTables.push(tblObj);
+
+      const card = document.createElement("div");
+      card.className = "card";
+      card.innerHTML = `<h2><span>${title}</span><span class="sub">${rows.length} x ${cols.length}</span></h2>`;
+      const wrap = document.createElement("div");
+      wrap.className = "table-wrap";
+      const table = document.createElement("table");
+
+      let html = `<thead><tr><th>${(rowAx === "solver" || rowAx === "diag_solver") ? t("th_solver") : rowAx}</th>` + cols.map(c => {
+        const lbl = colIsMetric ? metricSym(c) : c;
+        const tip = colIsMetric ? (METRIC_MAP[c]?.[currentLang] || "") : "";
+        return `<th title="${tip}">${lbl}</th>`;
+      }).join("") + `</tr></thead><tbody>`;
+      rows.forEach((rk, ri) => {
+        const firstNonEmpty = grid[ri].find(c => c.recs.length > 0);
+        const isBaseRow = rk.endsWith(" [baseline]");
+        const cleanRk = isBaseRow ? rk.slice(0, -11) : rk;
+        const rowDisp = rowIsMetric ? metricSym(cleanRk) : cleanRk;
+        const rowTip = rowIsMetric ? (METRIC_MAP[cleanRk]?.[currentLang] || "") : "";
+        const showConc = !rowIsMetric && (rowAx === "solver" || rowAx === "diag_solver" || rowAx === "algorithm");
+        html += `<tr><td title="${rowTip}">${rowDisp}` +
+          (isBaseRow ? ` <span class="badge base">${t("baseline")}</span>` : "") +
+          (showConc && firstNonEmpty ? " " + concBadge(firstNonEmpty.cm) : "") + `</td>`;
+        cols.forEach((ck, ci) => {
+          const cell = grid[ri][ci];
+          const bg = useHeat ? heatBg(cell.val, bestRef[ri][ci]) : "";
+          const rBadge = cell.rank === 1 ? `<span class="badge r1">#1</span>`
+                       : cell.rank === 2 ? `<span class="badge r2">#2</span>`
+                       : cell.rank === 3 ? `<span class="badge r3">#3</span>` : "";
+          html += `<td class="cell-click" data-ri="${ri}" data-ci="${ci}" style="${bg ? 'background:' + bg : ''}">${fmtVal(cell.mk, cell.val)} ${rBadge}</td>`;
+        });
+        html += `</tr>`;
+      });
+      html += `</tbody>`;
+      table.innerHTML = html;
+      table.querySelectorAll("td.cell-click").forEach(td => {
+        td.onclick = () => {
+          const cell = grid[Number(td.dataset.ri)][Number(td.dataset.ci)];
+          if (cell.recs.length) openInspector(cell.recs);
+        };
+      });
+      wrap.appendChild(table);
+      card.appendChild(wrap);
+
+      const actions = document.createElement("div");
+      actions.className = "table-actions";
+      actions.innerHTML = `<span class="sub">${t("export_table")}</span>`;
+      const slug = tk ? "_" + tk.replace(/[^a-zA-Z0-9_-]+/g, "_") : "";
+      [["csv", "CSV"], ["md", "Markdown"], ["typst", "Typst"], ["latex", "LaTeX"]].forEach(([fmt, lbl]) => {
+        const b = document.createElement("button");
+        b.className = "btn";
+        b.textContent = lbl;
+        b.onclick = () => exportTables(fmt, [tblObj], slug);
+        actions.appendChild(b);
+      });
+      card.appendChild(actions);
+      host.appendChild(card);
+    }
+
+    if (outTables.length > 1) {
+      const allCard = document.createElement("div");
+      allCard.className = "card";
+      const actions = document.createElement("div");
+      actions.className = "table-actions";
+      actions.style.marginTop = "0";
+      actions.style.paddingTop = "0";
+      actions.style.borderTop = "none";
+      actions.innerHTML = `<span class="sub">${t("export_all_tables")(outTables.length)}</span>`;
+      [["csv", "CSV"], ["md", "Markdown"], ["typst", "Typst"], ["latex", "LaTeX"]].forEach(([fmt, lbl]) => {
+        const b = document.createElement("button");
+        b.className = "btn";
+        b.textContent = lbl;
+        b.onclick = () => exportTables(fmt, outTables, "_all");
+        actions.appendChild(b);
+      });
+      allCard.appendChild(actions);
+      host.appendChild(allCard);
+    }
+    return outTables;
+  }
+
+  function renderBarChart(tables, metric) {
+    const box = $("barChartBox");
+    if (!tables.length || !tables[0].rows.length || !tables[0].cols.length) {
+      box.innerHTML = `<div class="sub">${t("no_data")}</div>`;
+      return;
+    }
+    const tbl = tables[0];
+    const useLog = $("chkLogChart").checked;
+
+    const colGroups = [];
+    const vals = [];
+    const activeRowIndices = new Set();
+    tbl.cols.forEach((col, ci) => {
+      const items = [];
+      tbl.rows.forEach((row, ri) => {
+        const v = tbl.grid[ri][ci].val;
+        if (Number.isFinite(v) && (!useLog || v > 0)) {
+          items.push({ ri, row, v });
+          vals.push(v);
+          activeRowIndices.add(ri);
+        }
+      });
+      if (items.length) colGroups.push({ col, items });
+    });
+
+    if (!vals.length) {
+      box.innerHTML = `<div class="sub">${t("no_positive")}</div>`;
+      return;
+    }
+
+    const minV = Math.min(...vals), maxV = Math.max(...vals);
+    const maxBarsInCol = Math.max(...colGroups.map(g => g.items.length));
+    const barW = Math.max(8, Math.min(18, Math.floor(110 / Math.max(1, maxBarsInCol))));
+    const barGap = 2;
+    const groupGap = 18;
+    const padL = 62, padR = 14, padT = 14, padB = 34;
+    const plotH = 155;
+
+    let curX = padL + 8;
+    const laidOut = colGroups.map(g => {
+      const barsW = g.items.length * barW + Math.max(0, g.items.length - 1) * barGap;
+      const lblW = Math.min(14, g.col.length) * 6.2;
+      const gW = Math.max(barsW, lblW, 38);
+      const x0 = curX;
+      curX += gW + groupGap;
+      return { ...g, x0, gW, barsW };
+    });
+
+    const W = Math.max(240, curX - groupGap + padR + 8);
+    const H = padT + plotH + padB;
+    const plotW = W - padL - padR;
+
+    const yMap = v => {
+      if (!Number.isFinite(v) || (useLog && v <= 0)) return padT + plotH;
+      if (useLog) {
+        const lo = Math.floor(Math.log10(minV)) - 0.35;
+        const hi = Math.ceil(Math.log10(maxV)) + 0.25;
+        const frac = (Math.log10(v) - lo) / Math.max(1e-6, hi - lo);
+        return padT + plotH * (1 - Math.max(0, Math.min(1, frac)));
+      }
+      return padT + plotH * (1 - v / (maxV * 1.08));
+    };
+
+    let svg = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">`;
+    svg += `<line x1="${padL}" y1="${padT}" x2="${padL}" y2="${padT+plotH}" stroke="#475569"/>`;
+    svg += `<line x1="${padL}" y1="${padT+plotH}" x2="${padL+plotW}" y2="${padT+plotH}" stroke="#475569"/>`;
+
+    for (let i = 0; i <= 4; i++) {
+      const y = padT + (plotH * i) / 4;
+      let tickVal;
+      if (useLog) {
+        const lo = Math.floor(Math.log10(minV)) - 0.35;
+        const hi = Math.ceil(Math.log10(maxV)) + 0.25;
+        tickVal = Math.pow(10, hi - ((hi - lo) * i) / 4);
+      } else {
+        tickVal = maxV * 1.08 * (1 - i / 4);
+      }
+      svg += `<line x1="${padL}" y1="${y}" x2="${padL+plotW}" y2="${y}" stroke="#263348" stroke-dasharray="2,3"/>`;
+      svg += `<text x="${padL-6}" y="${y+3}" fill="#94a3b8" font-size="10" text-anchor="end">${fmtVal(metric, tickVal)}</text>`;
+    }
+
+    laidOut.forEach(g => {
+      const bx0 = g.x0 + (g.gW - g.barsW) / 2;
+      g.items.forEach((item, idx) => {
+        const y = yMap(item.v);
+        const h = Math.max(2, padT + plotH - y);
+        const color = PALETTE[item.ri % PALETTE.length];
+        svg += `<rect x="${(bx0 + idx * (barW + barGap)).toFixed(1)}" y="${y.toFixed(1)}" width="${barW}" height="${h.toFixed(1)}" rx="1" fill="${color}" opacity="0.9"><title>${item.row} | ${g.col}: ${fmtVal(metric, item.v)}</title></rect>`;
+      });
+      svg += `<text x="${(g.x0 + g.gW / 2).toFixed(1)}" y="${padT + plotH + 15}" fill="#cbd5e1" font-size="10" text-anchor="middle">${g.col.slice(0, 14)}</text>`;
+    });
+    svg += `</svg>`;
+
+    const legendItems = Array.from(activeRowIndices).sort((a, b) => a - b).map(ri => {
+      const color = PALETTE[ri % PALETTE.length];
+      return `<span style="display:inline-flex;align-items:center;gap:5px;font-size:0.75rem;color:#cbd5e1;font-family:ui-monospace,monospace;"><span style="width:9px;height:9px;background:${color};display:inline-block;border-radius:2px;"></span>${tbl.rows[ri]}</span>`;
+    }).join("");
+
+    box.innerHTML = svg + `<div style="display:flex;flex-wrap:wrap;gap:10px 14px;margin-top:6px;padding:0 4px;">${legendItems}</div>`;
+  }
+
+  function renderProfileChart(filtered, metric) {
+    const box = $("profileChartBox");
+    const byProb = new Map();
+    const solvers = new Set();
+    for (const r of filtered) {
+      if (r.status !== "ok" || !Number.isFinite(r.metrics?.[metric])) continue;
+      const pk = problemKey(r), sk = diagSolverKey(r);
+      solvers.add(sk);
+      if (!byProb.has(pk)) byProb.set(pk, new Map());
+      if (!byProb.get(pk).has(sk)) byProb.get(pk).set(sk, []);
+      byProb.get(pk).get(sk).push(r.metrics[metric]);
+    }
+    const probs = Array.from(byProb.keys());
+    const solverList = Array.from(solvers).sort();
+    if (!probs.length || !solverList.length) {
+      box.innerHTML = `<div class="sub">${t("no_data")}</div>`;
+      return;
+    }
+
+    const ratiosBySolver = new Map(solverList.map(s => [s, []]));
+    for (const pk of probs) {
+      const pm = byProb.get(pk);
+      let best = Infinity;
+      const means = new Map();
+      for (const [sk, vals] of pm) {
+        const m = aggTrials(vals, "mean");
+        if (Number.isFinite(m)) { means.set(sk, m); if (m < best) best = m; }
+      }
+      best = Math.max(best, 1e-30);
+      for (const sk of solverList) {
+        const m = means.get(sk);
+        ratiosBySolver.get(sk).push(Number.isFinite(m) ? Math.max(1, Math.max(m, 1e-30) / best) : Infinity);
+      }
+    }
+
+    const W = 500, H = 205, padL = 46, padB = 38, padT = 14, padR = 14;
+    const plotW = W - padL - padR, plotH = H - padT - padB;
+    const maxLogTau = 3.0;
+
+    let svg = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">`;
+    svg += `<line x1="${padL}" y1="${padT}" x2="${padL}" y2="${padT+plotH}" stroke="#475569"/>`;
+    svg += `<line x1="${padL}" y1="${padT+plotH}" x2="${padL+plotW}" y2="${padT+plotH}" stroke="#475569"/>`;
+
+    for (let i = 0; i <= 4; i++) {
+      const y = padT + (plotH * i) / 4;
+      svg += `<line x1="${padL}" y1="${y}" x2="${padL+plotW}" y2="${y}" stroke="#263348" stroke-dasharray="2,3"/>`;
+      svg += `<text x="${padL-6}" y="${y+3}" fill="#94a3b8" font-size="10" text-anchor="end">${(100 - i * 25)}%</text>`;
+    }
+    for (let tt = 0; tt <= 3; tt++) {
+      const x = padL + (plotW * tt) / maxLogTau;
+      svg += `<text x="${x}" y="${padT + plotH + 14}" fill="#94a3b8" font-size="10" text-anchor="middle">${Math.pow(10, tt)}x</text>`;
+    }
+    svg += `<text x="${padL + plotW/2}" y="${padT + plotH + 29}" fill="#94a3b8" font-size="10" text-anchor="middle">${t("tau_axis")}</text>`;
+
+    solverList.forEach((sk, si) => {
+      const color = PALETTE[si % PALETTE.length];
+      const rs = ratiosBySolver.get(sk);
+      const pts = [];
+      for (let step = 0; step <= 60; step++) {
+        const logT = (maxLogTau * step) / 60;
+        const tau = Math.pow(10, logT);
+        const frac = rs.filter(v => v <= tau).length / probs.length;
+        pts.push(`${(padL + (plotW * logT) / maxLogTau).toFixed(1)},${(padT + plotH * (1 - frac)).toFixed(1)}`);
+      }
+      svg += `<polyline fill="none" stroke="${color}" stroke-width="2" points="${pts.join(" ")}"><title>${sk}</title></polyline>`;
+    });
+    svg += `</svg>`;
+
+    const legendItems = solverList.map((sk, si) => {
+      const color = PALETTE[si % PALETTE.length];
+      return `<span style="display:inline-flex;align-items:center;gap:5px;font-size:0.75rem;color:#cbd5e1;font-family:ui-monospace,monospace;"><span style="width:9px;height:9px;background:${color};display:inline-block;border-radius:2px;"></span>${sk}</span>`;
+    }).join("");
+    box.innerHTML = svg + `<div style="display:flex;flex-wrap:wrap;gap:10px 14px;margin-top:6px;padding:0 4px;">${legendItems}</div>`;
+  }
+
+  function openInspector(recs) {
+    const r = recs[0];
+    const body = $("drawerBody");
+    const metricRows = METRICS.map(m =>
+      `<tr><td title="${m[currentLang]}">${m.sym} (${m.key})</td><td>${fmtVal(m.key, r.metrics?.[m.key])}</td></tr>`
+    ).join("");
+    body.innerHTML = `
+      <div class="sub" style="margin-bottom:8px;">${t("record_of")(recs.length)}</div>
+      <table class="kv-table">
+        <tr><td>${t("th_solver")}</td><td><strong>${diagSolverKey(r)}</strong></td></tr>
+        <tr><td>matrix</td><td>${r.matrix_kind} (${r.matrix_size}, ${r.dtype})</td></tr>
+        <tr><td>trial / seed</td><td>${r.trial} / ${r.seed}</td></tr>
+        <tr><td>matrix_hash</td><td>${r.matrix_hash || "-"}</td></tr>
+        <tr><td>concurrency</td><td>${concBadge(r.concurrency_model)} (jobs=${r.runner_jobs})</td></tr>
+        <tr><td>status</td><td>${r.status} ${r.error_msg || ""}</td></tr>
+      </table>
+      <h3 style="font-size:0.86rem; margin:12px 0 6px;">${t("metrics_heading")}</h3>
+      <table class="kv-table">${metricRows}</table>`;
+    $("drawerBackdrop").classList.add("open");
+  }
+
+  function downloadText(filename, content) {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([content], { type: "text/plain;charset=utf-8" }));
+    a.download = filename; a.click();
+  }
+
+  function latexEscape(s) {
+    return String(s).replace(/[\\_%&#${}~^]/g, ch => ({
+      "\\": "\\textbackslash{}", "_": "\\_", "%": "\\%", "&": "\\&",
+      "#": "\\#", "$": "\\$", "{": "\\{", "}": "\\}",
+      "~": "\\textasciitilde{}", "^": "\\textasciicircum{}"
+    }[ch]));
+  }
+
+  function exportTables(fmt, tablesOverride, nameSuffix = "") {
+    const tables = tablesOverride || state.lastTables;
+    if (!tables.length) return;
+    const tag = isMetricAxisMode() ? "metrics" : $("selMetric").value;
+    let out = "";
+    for (const tb of tables) {
+      const rowHdr = (tb.rowAx === "solver" || tb.rowAx === "diag_solver" || !tb.rowAx) ? "solver (algorithm + diagonalizer)" : tb.rowAx;
+      const dispCol = c => tb.colIsMetric ? metricSym(c) : c;
+      const dispRow = r => tb.rowIsMetric ? metricSym(r) : r;
+      if (fmt === "csv") {
+        out += `# ${tb.title}\n${rowHdr},` + tb.cols.join(",") + "\n";
+        tb.rows.forEach((rk, ri) => {
+          out += rk + "," + tb.cols.map((_, ci) => fmtVal(tb.grid[ri][ci].mk, tb.grid[ri][ci].val)).join(",") + "\n";
+        });
+        out += "\n";
+      } else if (fmt === "md") {
+        out += `### ${tb.title}\n\n| ${rowHdr} | ` + tb.cols.map(dispCol).join(" | ") + " |\n| :--- | " + tb.cols.map(() => "---:").join(" | ") + " |\n";
+        tb.rows.forEach((rk, ri) => {
+          out += `| ${dispRow(rk)} | ` + tb.cols.map((_, ci) => {
+            const c = tb.grid[ri][ci];
+            const s = fmtVal(c.mk, c.val);
+            return c.rank === 1 ? `**${s}**` : s;
+          }).join(" | ") + " |\n";
+        });
+        out += "\n";
+      } else if (fmt === "typst") {
+        out += `// ${tb.title}\n#table(\n  columns: ${tb.cols.length + 1},\n  table.header([*${rowHdr}*], ` +
+          tb.cols.map(c => `[*${dispCol(c)}*]`).join(", ") + "),\n";
+        tb.rows.forEach((rk, ri) => {
+          out += `  [${dispRow(rk)}], ` + tb.cols.map((_, ci) => {
+            const c = tb.grid[ri][ci];
+            const s = fmtVal(c.mk, c.val);
+            return c.rank === 1 ? `[*${s}*]` : `[${s}]`;
+          }).join(", ") + ",\n";
+        });
+        out += ")\n\n";
+      } else if (fmt === "latex") {
+        const colSpec = "l" + " r".repeat(tb.cols.length);
+        out += `% ${tb.title}\n\\begin{table}[htbp]\n\\centering\n`;
+        out += `\\caption{${latexEscape(tb.title)}}\n`;
+        out += `\\begin{tabular}{${colSpec}}\n\\toprule\n`;
+        out += `\\textbf{${latexEscape(rowHdr)}} & ` + tb.cols.map(c => `\\textbf{${latexEscape(c)}}`).join(" & ") + " \\\\\n\\midrule\n";
+        tb.rows.forEach((rk, ri) => {
+          out += latexEscape(rk) + " & " + tb.cols.map((_, ci) => {
+            const c = tb.grid[ri][ci];
+            const s = latexEscape(fmtVal(c.mk, c.val));
+            return c.rank === 1 ? `\\textbf{${s}}` : s;
+          }).join(" & ") + " \\\\\n";
+        });
+        out += "\\bottomrule\n\\end{tabular}\n\\end{table}\n\n";
+      }
+    }
+    const ext = fmt === "typst" ? "typ" : (fmt === "latex" ? "tex" : fmt);
+    downloadText(`svd_slice_${tag}${nameSuffix}.${ext}`, out);
+  }
+
+  // Event wiring
+  const dz = $("dropzone"), fi = $("fileInput");
+  dz.onclick = () => fi.click();
+  dz.ondragover = e => { e.preventDefault(); dz.classList.add("drag"); };
+  dz.ondragleave = () => dz.classList.remove("drag");
+  dz.ondrop = e => {
+    e.preventDefault(); dz.classList.remove("drag");
+    Array.from(e.dataTransfer.files).forEach(f => f.text().then(txt => loadJsonlText(txt, f.name)));
+  };
+  fi.onchange = () => {
+    Array.from(fi.files).forEach(f => f.text().then(txt => loadJsonlText(txt, f.name)));
+    fi.value = "";
+  };
+
+  $("selRow").addEventListener("change", () => {
+    if ($("selRow").value === "metric" && $("selCol").value === "metric") $("selCol").value = "solver";
+    renderAll();
+  });
+  $("selCol").addEventListener("change", () => {
+    if ($("selCol").value === "metric" && $("selRow").value === "metric") $("selRow").value = "solver";
+    renderAll();
+  });
+
+  ["selMetric","selTable","selTrial","selRankSort","chkBroadcast","chkHeatmap","chkLogChart"]
+    .forEach(id => $(id).addEventListener("change", renderAll));
+  $("txtQuery").addEventListener("input", renderAll);
+
+  ["cliTrials","cliSeed","cliJobs","cliOutput","cliExtraQuery","cliResume","cliNestedBlas"]
+    .forEach(id => $(id).addEventListener("input", renderCliPreview));
+  ["cliResume","cliNestedBlas"]
+    .forEach(id => $(id).addEventListener("change", renderCliPreview));
+
+  $("btnAddCliSize").onclick = () => {
+    const raw = $("cliCustomSize").value.trim().toLowerCase();
+    if (!raw) return;
+    const norm = /^\d+$/.test(raw) ? `${raw}x${raw}` : (/^\d+x\d+$/.test(raw) ? raw : "");
+    if (!norm) return;
+    if (!state.cliCatalog.matrix_size.includes(norm)) state.cliCatalog.matrix_size.push(norm);
+    state.cliSelected.matrix_size.add(norm);
+    $("cliCustomSize").value = "";
+    renderCliChips();
+    renderCliPreview();
+  };
+  $("cliCustomSize").addEventListener("keydown", e => {
+    if (e.key === "Enter") { e.preventDefault(); $("btnAddCliSize").click(); }
+  });
+
+  $("btnSyncCli").onclick = () => {
+    if (!state.records.length) return;
+    for (const ax of ["algorithm", "diagonalizer", "matrix_kind", "matrix_size"]) {
+      state.cliSelected[ax] = new Set(state.chipState[ax]);
+    }
+    if (state.trials.length) $("cliTrials").value = state.trials.length;
+    const q = $("txtQuery").value.trim();
+    if (q) $("cliExtraQuery").value = q;
+    renderCliChips();
+    renderCliPreview();
+  };
+
+  $("btnCloseDrawer").onclick = () => $("drawerBackdrop").classList.remove("open");
+  $("drawerBackdrop").onclick = e => { if (e.target === $("drawerBackdrop")) $("drawerBackdrop").classList.remove("open"); };
+  $("btnCopyCli").onclick = () => navigator.clipboard?.writeText($("cliPreview").textContent);
+  $("btnClear").onclick = () => { state.headers = []; state.records = []; applyLanguage(); };
+
+  $("btnSelectAllFilters").onclick = () => {
+    const metricMode = isMetricAxisMode();
+    for (const [ax, vals] of Object.entries(state.allVals)) {
+      if (ax === "metric" && !metricMode) continue;
+      state.chipState[ax] = new Set(vals);
+    }
+    renderAll();
+  };
+  $("btnDeselectAllFilters").onclick = () => {
+    const metricMode = isMetricAxisMode();
+    for (const ax of Object.keys(state.allVals)) {
+      if (ax === "metric" && !metricMode) continue;
+      state.chipState[ax] = new Set();
+    }
+    renderAll();
+  };
+
+  function setLang(lang) {
+    currentLang = lang;
+    try { localStorage.setItem("svd_bench_lang", lang); } catch (_) {}
+    applyLanguage();
+  }
+  $("btnLangEn").onclick = () => setLang("en");
+  $("btnLangRu").onclick = () => setLang("ru");
+
+  populateMetricSelect();
+  applyLanguage();
+})();
+</script>
+</body>
+</html>

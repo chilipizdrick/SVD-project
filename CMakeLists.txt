@@ -83,6 +83,17 @@ set(HEADER_FILES
     src/lib/testing/SVD_Test.cpp
     src/lib/testing/SVD_Test_config.h
 
+    # Parallel tensor benchmark framework
+    src/lib/benchmark/types.h
+    src/lib/benchmark/metrics.h
+    src/lib/benchmark/matrix_generators.h
+    src/lib/benchmark/solver_registry.h
+    src/lib/benchmark/query.h
+    src/lib/benchmark/storage.h
+    src/lib/benchmark/thread_pool.h
+    src/lib/benchmark/runner.h
+    src/lib/benchmark/tensor_view.h
+
     # Standard algorithms
     src/lib/dqds/dqds.h
     src/lib/dqds/dqds.cpp
@@ -94,8 +105,13 @@ set(HEADER_FILES
     src/lib/iterative_refinement/iterative_refinement.cpp
 
     # Parfenov's & Drozdov's ideas
-    src/lib/halley/halley_svd.h
-    src/lib/halley/halley_svd.cpp
+    src/lib/polar_decomposition/polar_enums.h
+    src/lib/polar_decomposition/polar_algorithms.h
+    src/lib/polar_decomposition/polar_algorithms.cpp
+    src/lib/polar_decomposition/diagonalizers.h
+    src/lib/polar_decomposition/diagonalizers.cpp
+    src/lib/polar_decomposition/polar_svd.h
+    src/lib/polar_decomposition/polar_svd.cpp
     src/lib/idea1_givref/givens_refinement.h
     src/lib/idea1_givref/givens_refinement.cpp
     src/lib/idea2_revjac/reverse_jacobi.h
@@ -156,6 +172,5 @@ svd_add_test(svd_test testing.cpp)
 svd_add_test(svd_test_givref givens_refinement.cpp)
 svd_add_test(svd_test_revjac reverse_jacobi.cpp)
 svd_add_test(svd_test_golub_kahan golub_kahan.cpp)
-svd_add_test(svd_benchmark svd_benchmark.cpp)
-svd_add_test(svd_benchmark_hdr_clusters svd_benchmark_hdr_clusters.cpp)
+svd_add_test(svd_bench svd_bench.cpp)
 

@@ -13,7 +13,7 @@
 #include "jacobi/jacobi.h"
 
 // Experimental ideas
-#include "halley/halley_svd.h"
+#include "polar_decomposition/polar_svd.h"
 #include "idea1_givref/givens_refinement.h"
 #include "idea2_revjac/pseudo_reverse_jacobi.h"
 #include "idea2_revjac/reverse_jacobi.h"
