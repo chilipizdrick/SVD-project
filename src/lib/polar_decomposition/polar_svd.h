@@ -146,6 +146,19 @@ using Halley_SVD_TridiagDC =
     Polar_SVD<_MatrixType, PolarAlgorithm::Halley,
               DiagonalizationAlgorithm::TridiagDC>;
 
+// Convenience Newton polar SVD aliases
+template <typename _MatrixType,
+          DiagonalizationAlgorithm _DiagMethod =
+              DiagonalizationAlgorithm::TwoSidedJacobi>
+using Newton_Polar_SVD =
+    Polar_SVD<_MatrixType, PolarAlgorithm::Newton, _DiagMethod>;
+
+template <typename _MatrixType,
+          DiagonalizationAlgorithm _DiagMethod =
+              DiagonalizationAlgorithm::TwoSidedJacobi>
+using Newton_Polar_SVD_Acceleration =
+    Polar_SVD<_MatrixType, PolarAlgorithm::NewtonAccelerated, _DiagMethod>;
+
 }  // namespace SVD_Project
 
 #include "polar_svd.cpp"

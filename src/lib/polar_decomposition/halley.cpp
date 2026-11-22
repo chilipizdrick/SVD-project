@@ -5,7 +5,7 @@
 #include <limits>
 #include <ostream>
 
-#include "polar_algorithms.h"
+#include "halley.h"
 
 namespace SVD_Project {
 
@@ -118,19 +118,6 @@ void HalleyPolar<_MatrixType>::compute(const MatrixDynamic& A, MatrixDynamic& Q,
   Q = X;
   H = RealScalar(0.5) * (Q.adjoint() * A + A.adjoint() * Q);
   H = RealScalar(0.5) * (H + H.adjoint());
-}
-
-template <typename _MatrixType>
-void PolarDecomposition<_MatrixType>::compute(PolarAlgorithm method,
-                                            const MatrixDynamic& A,
-                                            MatrixDynamic& Q, MatrixDynamic& H,
-                                            std::ostream* os) {
-  switch (method) {
-    case PolarAlgorithm::Halley:
-    default:
-      HalleyPolar<_MatrixType>::compute(A, Q, H, os);
-      break;
-  }
 }
 
 }  // namespace SVD_Project

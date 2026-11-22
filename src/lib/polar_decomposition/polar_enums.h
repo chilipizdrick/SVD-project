@@ -6,7 +6,9 @@ namespace SVD_Project {
  * @brief Polar decomposition algorithm used to compute A = Q * H.
  */
 enum class PolarAlgorithm {
-  Halley = 0  // Dynamically weighted Halley iteration (QDWH)
+  Halley = 0,            // Dynamically weighted Halley iteration (QDWH)
+  Newton = 1,            // Classical Newton polar iteration
+  NewtonAccelerated = 2  // Norm-accelerated (scaled) Newton polar iteration
 };
 
 /**

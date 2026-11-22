@@ -145,6 +145,10 @@ const std::vector<typename SVD_Test<FloatingPoint, MatrixType>::AlgorithmInfo>
             "SVD_Project::v0_RevJac_SVD"),
         createAlgorithmInfoEntry<SVD_Project::NaiveMRRR_SVD>(
             "SVD_Project::NaiveMRRR_SVD"),
+        createAlgorithmInfoEntry<SVD_Project::Newton_Polar_SVD>(
+            "SVD_Project::Newton_Polar_SVD"),
+        createAlgorithmInfoEntry<SVD_Project::Newton_Polar_SVD_Acceleration>(
+            "SVD_Project::Newton_Polar_SVD_Acceleration"),
         // createAlgorithmInfoEntry<SVD_Project::NaiveBidiagSVD>(
         //     "SVD_Project::NaiveBidiagSVD"),
         createAlgorithmInfoEntry<Eigen::JacobiSVD>("Eigen::JacobiSVD")};

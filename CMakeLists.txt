@@ -106,8 +106,13 @@ set(HEADER_FILES
 
     # Parfenov's & Drozdov's ideas
     src/lib/polar_decomposition/polar_enums.h
+    src/lib/polar_decomposition/halley.h
+    src/lib/polar_decomposition/halley.cpp
+    src/lib/polar_decomposition/newton.h
+    src/lib/polar_decomposition/newton.hpp
+    src/lib/polar_decomposition/newton_acceleration.h
+    src/lib/polar_decomposition/newton_acceleration.hpp
     src/lib/polar_decomposition/polar_algorithms.h
-    src/lib/polar_decomposition/polar_algorithms.cpp
     src/lib/polar_decomposition/diagonalizers.h
     src/lib/polar_decomposition/diagonalizers.cpp
     src/lib/polar_decomposition/polar_svd.h
@@ -173,4 +178,3 @@ svd_add_test(svd_test_givref givens_refinement.cpp)
 svd_add_test(svd_test_revjac reverse_jacobi.cpp)
 svd_add_test(svd_test_golub_kahan golub_kahan.cpp)
 svd_add_test(svd_bench svd_bench.cpp)
-

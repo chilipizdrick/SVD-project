@@ -112,59 +112,52 @@ class SolverRegistry {
     SolverRegistry reg;
 
     // ------------------------------------------------------------------------
-    // Polar-decomposition SVD strategies
-    // Currently implemented: Halley (QDWH).
-    // Extension hook: When Newton or Haghani polar solvers are implemented,
-    // register them here via reg.register_polar("newton", ...) /
-    // reg.register_polar("haghani", ...); no other files require changes.
+    // Polar-decomposition SVD strategies (Halley, Newton, Newton-Accelerated)
     // ------------------------------------------------------------------------
-    reg.register_polar(
-        "halley", "tridiag_dc", ConcurrencyModel::LapackDiag,
-        "Halley (QDWH) polar + Householder tridiagonal D&C (LAPACK dsyevd)",
-        [](const Eigen::MatrixXd& A) -> SVDOutput {
-          SVD_Project::Polar_SVD<
-              Eigen::MatrixXd, SVD_Project::PolarAlgorithm::Halley,
-              SVD_Project::DiagonalizationAlgorithm::TridiagDC>
-              svd;
-          svd.compute(A, Eigen::ComputeFullU | Eigen::ComputeFullV);
-          return {svd.matrixU(), svd.singularValues(), svd.matrixV()};
-        });
+    auto register_polar_family =
+        [&]<SVD_Project::PolarAlgorithm PolarAlg>(
+            const std::string& algo_name, const std::string& polar_label) {
+          auto register_one =
+              [&]<SVD_Project::DiagonalizationAlgorithm DiagAlg>(
+                  const std::string& diag_name, ConcurrencyModel concurrency,
+                  const std::string& diag_desc) {
+                reg.register_polar(
+                    algo_name, diag_name, concurrency,
+                    polar_label + " polar + " + diag_desc,
+                    [](const Eigen::MatrixXd& A) -> SVDOutput {
+                      SVD_Project::Polar_SVD<Eigen::MatrixXd, PolarAlg, DiagAlg>
+                          svd;
+                      svd.compute(A, Eigen::ComputeFullU | Eigen::ComputeFullV);
+                      return {svd.matrixU(), svd.singularValues(),
+                              svd.matrixV()};
+                    });
+              };
 
-    reg.register_polar(
-        "halley", "two_sided_jacobi", ConcurrencyModel::Serial,
-        "Halley (QDWH) polar + classical two-sided cyclic Jacobi on H",
-        [](const Eigen::MatrixXd& A) -> SVDOutput {
-          SVD_Project::Polar_SVD<
-              Eigen::MatrixXd, SVD_Project::PolarAlgorithm::Halley,
-              SVD_Project::DiagonalizationAlgorithm::TwoSidedJacobi>
-              svd;
-          svd.compute(A, Eigen::ComputeFullU | Eigen::ComputeFullV);
-          return {svd.matrixU(), svd.singularValues(), svd.matrixV()};
-        });
+          register_one.template operator()<
+              SVD_Project::DiagonalizationAlgorithm::TridiagDC>(
+              "tridiag_dc", ConcurrencyModel::LapackDiag,
+              "Householder tridiagonal D&C (LAPACK dsyevd)");
+          register_one.template operator()<
+              SVD_Project::DiagonalizationAlgorithm::TwoSidedJacobi>(
+              "two_sided_jacobi", ConcurrencyModel::Serial,
+              "classical two-sided cyclic Jacobi on H");
+          register_one.template operator()<
+              SVD_Project::DiagonalizationAlgorithm::CholeskyOneSided>(
+              "cholesky_onesided", ConcurrencyModel::Serial,
+              "pivoted Cholesky & one-sided Jacobi on H");
+          register_one.template operator()<
+              SVD_Project::DiagonalizationAlgorithm::QDWH_EIG>(
+              "qdwh_eig", ConcurrencyModel::Serial,
+              "spectral divide & conquer (QDWH-EIG) on H");
+        };
 
-    reg.register_polar(
-        "halley", "cholesky_onesided", ConcurrencyModel::Serial,
-        "Halley (QDWH) polar + pivoted Cholesky & one-sided Jacobi on H",
-        [](const Eigen::MatrixXd& A) -> SVDOutput {
-          SVD_Project::Polar_SVD<
-              Eigen::MatrixXd, SVD_Project::PolarAlgorithm::Halley,
-              SVD_Project::DiagonalizationAlgorithm::CholeskyOneSided>
-              svd;
-          svd.compute(A, Eigen::ComputeFullU | Eigen::ComputeFullV);
-          return {svd.matrixU(), svd.singularValues(), svd.matrixV()};
-        });
-
-    reg.register_polar(
-        "halley", "qdwh_eig", ConcurrencyModel::Serial,
-        "Halley (QDWH) polar + spectral divide & conquer (QDWH-EIG) on H",
-        [](const Eigen::MatrixXd& A) -> SVDOutput {
-          SVD_Project::Polar_SVD<
-              Eigen::MatrixXd, SVD_Project::PolarAlgorithm::Halley,
-              SVD_Project::DiagonalizationAlgorithm::QDWH_EIG>
-              svd;
-          svd.compute(A, Eigen::ComputeFullU | Eigen::ComputeFullV);
-          return {svd.matrixU(), svd.singularValues(), svd.matrixV()};
-        });
+    register_polar_family.template operator()<
+        SVD_Project::PolarAlgorithm::Halley>("halley", "Halley (QDWH)");
+    register_polar_family.template operator()<
+        SVD_Project::PolarAlgorithm::Newton>("newton", "Newton");
+    register_polar_family.template operator()<
+        SVD_Project::PolarAlgorithm::NewtonAccelerated>(
+        "newton_accel", "Newton accelerated");
 
     // ------------------------------------------------------------------------
     // Non-Polar Baselines (diagonalizer = "none")

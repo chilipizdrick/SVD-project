@@ -434,7 +434,7 @@
   };
 
   const DEFAULT_CATALOG = {
-    algorithm: ["halley", "dgesdd", "dgesvd", "dbdsvdx", "eigen_jacobi"],
+    algorithm: ["halley", "newton", "newton_accel", "dgesdd", "dgesvd", "dbdsvdx", "eigen_jacobi"],
     diagonalizer: ["tridiag_dc", "two_sided_jacobi", "cholesky_onesided", "qdwh_eig", "none"],
     matrix_kind: [
       "twin_clusters", "tight_10_clusters", "wide_hdr", "lauchli", "golub_int",

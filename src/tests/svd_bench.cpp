@@ -54,7 +54,7 @@ USAGE:
 RUN OPTIONS:
   -q, --query <expr>         Boolean filter expression, e.g.:
                              "algo=halley and diag in (tridiag_dc,qdwh_eig) and matrix!=hilbert"
-  --algo <a,b,...>           Filter algorithms (e.g. halley,dgesdd,dgesvd,dbdsvdx,eigen_jacobi)
+  --algo <a,b,...>           Filter algorithms (e.g. halley,newton,newton_accel,dgesdd,dgesvd,dbdsvdx,eigen_jacobi)
   --diag <d1,d2,...>         Filter diagonalizers (tridiag_dc,two_sided_jacobi,cholesky_onesided,qdwh_eig,none)
   --matrix <m1,m2,...>       Filter matrix kinds (e.g. twin_clusters,hilbert,clustered_hdr)
   --size <s1,s2,...>         Matrix sizes to generate (e.g. 100x100,500x500; default: 100x100)

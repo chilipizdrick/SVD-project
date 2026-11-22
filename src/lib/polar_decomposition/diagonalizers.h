@@ -3,7 +3,7 @@
 #include <Eigen/Dense>
 #include <lapacke.h>
 
-#include "polar_algorithms.h"
+#include "halley.h"
 #include "polar_enums.h"
 
 namespace SVD_Project {
